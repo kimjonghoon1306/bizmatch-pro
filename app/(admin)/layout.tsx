@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '1px solid var(--border)', marginTop: 24 }}>
+        <div style={{ paddingTop: 24, borderTop: '1px solid var(--border)', marginTop: 24 }}>
           <p style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
             BizMatch PRO v0.1.0
           </p>
