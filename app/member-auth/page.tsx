@@ -159,7 +159,6 @@ export default function MemberAuthPage() {
   const [pw2, setPw2] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [apiKey, setApiKey] = useState('')
   const [findVal, setFindVal] = useState('')
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
@@ -181,7 +180,7 @@ export default function MemberAuthPage() {
 
   function reset() {
     setEmail(''); setPw(''); setPw2(''); setName(''); setPhone('')
-    setApiKey(''); setFindVal(''); setError(''); setOk('')
+    setFindVal(''); setError(''); setOk('')
     setRegDone(false); setFindDone(false)
   }
 
@@ -237,7 +236,7 @@ export default function MemberAuthPage() {
 
   function openMypage() {
     if (!memberInfo) return
-    setEditName(memberInfo.name); setEditPhone(memberInfo.phone); setEditApiKey(memberInfo.apiKey || '')
+    setEditName(memberInfo.name); setEditPhone(memberInfo.phone)
     setNewPw(''); setNewPw2('')
     go('mypage')
   }
