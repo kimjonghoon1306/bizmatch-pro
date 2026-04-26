@@ -36,7 +36,7 @@ function buildTemplateHtml(templateId: string, title: string, content: string): 
 
   let mainContent = content
     .replace(/\[FAQ시작\][\s\S]*?\[FAQ끝\]/g, '')
-    .replace(/\[참고자료시작\][\s\S]*?[\[참고자료끝\]/g, '')
+    .replace(/\[참고자료시작\][\s\S]*?\[참고자료끝\]/g, '')
     .replace(/\[관련글시작\][\s\S]*?\[관련글끝\]/g, '')
     .trim()
 
