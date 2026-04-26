@@ -1,342 +1,487 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Lead, DashboardStats } from '@/lib/types'
 import { formatRelative, statusLabel } from '@/lib/utils'
 
-function StatCard({ label, value, icon, color, sub, delay }: {
-  label: string; value: string | number; icon: string
-  color: string; sub?: string; delay: number
-}) {
-  const [displayed, setDisplayed] = useState(0)
-  const numVal = typeof value === 'number' ? value : parseInt(String(value)) || 0
-  useEffect(() => {
-    let start = 0
-    const step = Math.max(1, Math.ceil(numVal / 30))
-    const timer = setInterval(() => {
-      start = Math.min(start + step, numVal)
-      setDisplayed(start)
-      if (start >= numVal) clearInterval(timer)
-    }, 40)
-    return () => clearInterval(timer)
-  }, [numVal])
+// ────────────────────────────────────────────
+// MINI LINE CHART (SVG)
+// ────────────────────────────────────────────
+function MiniLineChart({ data, color }: { data: number[]; color: string }) {
+  if (!data.length) return null
+  const w = 120; const h = 40; const pad = 4
+  const max = Math.max(...data, 1)
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1 || 1)) * (w - pad * 2)
+    const y = h - pad - (v / max) * (h - pad * 2)
+    return `${x},${y}`
+  }).join(' ')
+  const areaBottom = `${w - pad},${h - pad} ${pad},${h - pad}`
   return (
-    <div
-      className="stat-card-hover"
-      style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 18, padding: '20px 16px', position: 'relative',
-        overflow: 'hidden', transition: 'transform 0.2s, box-shadow 0.2s',
-        animationDelay: `${delay}ms`,
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: -20, right: -20,
-        width: 80, height: 80, borderRadius: '50%',
-        background: color, opacity: 0.12, filter: 'blur(20px)',
-      }} />
-      <div style={{ fontSize: 28, marginBottom: 10 }}>{icon}</div>
-      <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1, color, lineHeight: 1 }}>
-        {typeof value === 'string' && value.includes('%') ? `${displayed}%` : displayed}
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600, marginTop: 4 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>}
-    </div>
+    <svg width={w} height={h} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={`${pts} ${areaBottom}`} fill={`url(#grad-${color.replace('#','')})`} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {data.map((v, i) => {
+        const x = pad + (i / (data.length - 1 || 1)) * (w - pad * 2)
+        const y = h - pad - (v / max) * (h - pad * 2)
+        return i === data.length - 1 ? (
+          <circle key={i} cx={x} cy={y} r="3" fill={color} />
+        ) : null
+      })}
+    </svg>
   )
 }
 
+// ────────────────────────────────────────────
+// DONUT CHART
+// ────────────────────────────────────────────
+function DonutChart({ segments }: { segments: { value: number; color: string; label: string }[] }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1
+  const r = 54; const cx = 64; const cy = 64; const stroke = 16
+  let offset = 0
+  const circumference = 2 * Math.PI * r
+  return (
+    <svg width="128" height="128" style={{ transform: 'rotate(-90deg)' }}>
+      {segments.map((seg, i) => {
+        const pct = seg.value / total
+        const dash = pct * circumference
+        const gap = circumference - dash
+        const el = (
+          <circle key={i} cx={cx} cy={cy} r={r}
+            fill="none" stroke={seg.color} strokeWidth={stroke}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-offset * circumference}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dasharray 1s cubic-bezier(0.34,1.56,0.64,1)' }}
+          />
+        )
+        offset += pct
+        return el
+      })}
+      <circle cx={cx} cy={cy} r={r - stroke / 2} fill="none" stroke="var(--bg3)" strokeWidth="1" />
+    </svg>
+  )
+}
+
+// ────────────────────────────────────────────
+// ANIMATED COUNTER
+// ────────────────────────────────────────────
+function Counter({ value, suffix = '' }: { value: number; suffix?: string }) {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    let cur = 0
+    const step = Math.max(1, Math.ceil(value / 40))
+    const t = setInterval(() => {
+      cur = Math.min(cur + step, value)
+      setN(cur)
+      if (cur >= value) clearInterval(t)
+    }, 30)
+    return () => clearInterval(t)
+  }, [value])
+  return <>{n}{suffix}</>
+}
+
+// ────────────────────────────────────────────
+// FLOATING MASCOT
+// ────────────────────────────────────────────
+function Mascot({ emoji, size = 56, style }: { emoji: string; size?: number; style?: React.CSSProperties }) {
+  return (
+    <span style={{
+      fontSize: size, display: 'inline-block',
+      animation: 'mascotFloat 4s ease-in-out infinite',
+      filter: `drop-shadow(0 8px 16px rgba(108,99,255,0.35))`,
+      ...style,
+    }}>{emoji}</span>
+  )
+}
+
+// ────────────────────────────────────────────
+// FUNNEL
+// ────────────────────────────────────────────
 function FunnelBar({ label, pct, count, color, delay }: {
   label: string; pct: number; count: number; color: string; delay: number
 }) {
-  const [width, setWidth] = useState(0)
+  const [w, setW] = useState(0)
   useEffect(() => {
-    const t = setTimeout(() => setWidth(pct), 400 + delay)
+    const t = setTimeout(() => setW(pct), 500 + delay)
     return () => clearTimeout(t)
   }, [pct, delay])
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
         <span style={{ fontWeight: 600, color: 'var(--text2)' }}>{label}</span>
         <span style={{ fontWeight: 800, color }}>{count}명 · {pct}%</span>
       </div>
-      <div style={{ height: 10, background: 'var(--bg3)', borderRadius: 100, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', borderRadius: 100, background: color,
-          width: `${width}%`, transition: 'width 1.2s cubic-bezier(0.34,1.56,0.64,1)',
-        }} />
+      <div style={{ height: 12, background: 'var(--bg3)', borderRadius: 100, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: '100%', borderRadius: 100, background: `linear-gradient(90deg, ${color}99, ${color})`, width: `${w}%`, transition: 'width 1.2s cubic-bezier(0.34,1.56,0.64,1)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 2s infinite', borderRadius: 100 }} />
       </div>
     </div>
   )
 }
 
-function LeadRow({ lead, idx }: { lead: Lead; idx: number }) {
-  const colors: Record<string, string> = {
-    new: '#6c63ff', contact: '#f59e0b', done: '#22c55e', trash: '#ef4444',
-  }
-  const c = colors[lead.status] ?? '#6c63ff'
+// ────────────────────────────────────────────
+// LEAD ROW
+// ────────────────────────────────────────────
+function LeadRow({ lead }: { lead: Lead }) {
+  const c: Record<string, string> = { new: '#6c63ff', contact: '#f59e0b', done: '#22c55e', trash: '#ef4444' }
+  const col = c[lead.status] ?? '#6c63ff'
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 0', borderBottom: '1px solid var(--border)',
-    }}>
-      <div style={{
-        width: 38, height: 38, borderRadius: '50%',
-        background: `${c}22`, color: c,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 800, fontSize: 14, flexShrink: 0,
-      }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${col}22`, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
         {lead.name.slice(0, 1)}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700 }}>{lead.name}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.name}</div>
         <div style={{ fontSize: 11, color: 'var(--text3)' }}>{formatRelative(lead.created_at)}</div>
       </div>
-      <div style={{
-        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 100,
-        background: `${c}22`, color: c, flexShrink: 0,
-      }}>
+      <div style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 100, background: `${col}22`, color: col, flexShrink: 0 }}>
         {statusLabel[lead.status]}
       </div>
     </div>
   )
 }
 
+// ────────────────────────────────────────────
+// MAIN
+// ────────────────────────────────────────────
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalLeads: 0, todayLeads: 0, contactingLeads: 0, doneLeads: 0, conversionRate: 0,
-  })
+  const [stats, setStats] = useState<DashboardStats>({ totalLeads: 0, todayLeads: 0, contactingLeads: 0, doneLeads: 0, conversionRate: 0 })
   const [recentLeads, setRecentLeads] = useState<Lead[]>([])
+  const [weeklyData, setWeeklyData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
-    const update = () => setTime(
-      new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    )
-    update()
-    const t = setInterval(update, 1000)
-    return () => clearInterval(t)
+    const tick = () => setTime(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    tick(); const t = setInterval(tick, 1000); return () => clearInterval(t)
   }, [])
 
   useEffect(() => {
     async function load() {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const { data: leads } = await supabase
-        .from('leads').select('*').neq('status', 'trash')
-        .order('created_at', { ascending: false })
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const { data: leads } = await supabase.from('leads').select('*').neq('status', 'trash').order('created_at', { ascending: false })
       if (!leads) { setLoading(false); return }
       const todayLeads = leads.filter(l => new Date(l.created_at) >= today).length
       const contactingLeads = leads.filter(l => l.status === 'contact').length
       const doneLeads = leads.filter(l => l.status === 'done').length
       const rate = leads.length > 0 ? Math.round((doneLeads / leads.length) * 100) : 0
       setStats({ totalLeads: leads.length, todayLeads, contactingLeads, doneLeads, conversionRate: rate })
-      setRecentLeads(leads.slice(0, 6))
+      setRecentLeads(leads.slice(0, 8))
+      // 주간 데이터
+      const weekly = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (6 - i)); d.setHours(0, 0, 0, 0)
+        const next = new Date(d); next.setDate(next.getDate() + 1)
+        return leads.filter(l => { const t = new Date(l.created_at); return t >= d && t < next }).length
+      })
+      setWeeklyData(weekly)
       setLoading(false)
     }
     load()
   }, [])
 
+  const days = ['월', '화', '수', '목', '금', '토', '일']
+  const todayIdx = (new Date().getDay() + 6) % 7
+
   const funnelData = [
     { label: '📥 신청 접수', count: stats.totalLeads, pct: 100, color: '#6c63ff' },
-    {
-      label: '📞 연락 완료',
-      count: stats.contactingLeads + stats.doneLeads,
-      pct: stats.totalLeads > 0
-        ? Math.round(((stats.contactingLeads + stats.doneLeads) / stats.totalLeads) * 100)
-        : 0,
-      color: '#f59e0b',
-    },
-    {
-      label: '✅ 최종 전환',
-      count: stats.doneLeads,
-      pct: stats.totalLeads > 0
-        ? Math.round((stats.doneLeads / stats.totalLeads) * 100)
-        : 0,
-      color: '#22c55e',
-    },
+    { label: '📞 연락 완료', count: stats.contactingLeads + stats.doneLeads, pct: stats.totalLeads > 0 ? Math.round(((stats.contactingLeads + stats.doneLeads) / stats.totalLeads) * 100) : 0, color: '#f59e0b' },
+    { label: '✅ 최종 전환', count: stats.doneLeads, pct: stats.totalLeads > 0 ? Math.round((stats.doneLeads / stats.totalLeads) * 100) : 0, color: '#22c55e' },
   ]
 
-  const particles = Array.from({ length: 12 }, (_, i) => ({
-    left: `${(i * 41 + 13) % 100}%`,
-    top: `${(i * 57 + 9) % 80}%`,
-    width: `${8 + (i % 3) * 6}px`,
-    height: `${8 + (i % 3) * 6}px`,
-    background: ['#6c63ff', '#f472b6', '#22c55e', '#f59e0b', '#38bdf8'][i % 5],
-    borderRadius: i % 2 === 0 ? '50%' : '4px',
-    opacity: 0.2,
-    animationDuration: `${3 + (i % 3)}s`,
-    animationDelay: `${i * 0.4}s`,
-  }))
+  const donutData = [
+    { value: stats.todayLeads,       color: '#6c63ff', label: '신규' },
+    { value: stats.contactingLeads,  color: '#f59e0b', label: '연락중' },
+    { value: stats.doneLeads,        color: '#22c55e', label: '완료' },
+  ]
+
+  const skel = (h: number) => (
+    <div style={{ height: h, borderRadius: 12, background: 'var(--surface2)', animation: 'skelPulse 1.5s infinite' }} />
+  )
 
   return (
     <>
       <style>{`
-        .stat-card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.15); }
-        .action-btn { display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;text-decoration:none;color:var(--text);transition:all 0.2s; }
-        .action-btn:hover { transform:translateY(-3px);border-color:var(--accent);box-shadow:0 8px 24px var(--accent-glow); }
-        .float-icon { animation:floatIcon 3s ease-in-out infinite alternate;display:inline-block; }
-        @keyframes floatIcon { 0%{transform:translateY(0)} 100%{transform:translateY(-6px)} }
-        .char-float { animation:charFloat 4s ease-in-out infinite;display:inline-block;filter:drop-shadow(0 8px 24px rgba(108,99,255,0.4)); }
-        @keyframes charFloat { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-16px) rotate(3deg)} }
-        .particle { position:absolute;animation:particleFloat var(--pdur,4s) ease-in-out infinite alternate;pointer-events:none; }
-        @keyframes particleFloat { 0%{transform:translateY(0) rotate(0deg) scale(1)} 100%{transform:translateY(-20px) rotate(180deg) scale(1.2)} }
-        .wave-svg { display:block;animation:waveMove 6s ease-in-out infinite alternate; }
-        @keyframes waveMove { 0%{transform:translateX(0)} 100%{transform:translateX(-40px)} }
-        .pulse-dot { animation:pulseDot 2s infinite; }
+        @keyframes mascotFloat { 0%,100%{transform:translateY(0) rotate(-4deg)} 50%{transform:translateY(-14px) rotate(4deg)} }
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes skelPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes waveAnim { 0%{transform:translateX(0)} 100%{transform:translateX(-40px)} }
         @keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.5)} }
-        .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:-40px;margin-bottom:24px;position:relative;z-index:2; }
-        .actions-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px; }
-        .main-grid { display:grid;grid-template-columns:1fr 280px;gap:18px;align-items:start; }
-        @media(max-width:900px) { .stats-grid{grid-template-columns:repeat(2,1fr)} .main-grid{grid-template-columns:1fr} .pc-aside{display:none!important} }
-        @media(max-width:480px) { .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px} .actions-grid{grid-template-columns:repeat(2,1fr)} }
+        @keyframes particleFloat { 0%{transform:translateY(0) rotate(0deg)} 100%{transform:translateY(-18px) rotate(180deg)} }
+        @keyframes gradientShift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+        .card { background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;animation:fadeUp 0.5s ease both; }
+        .card:hover { border-color:var(--border2); }
+        .pulse-dot { width:8px;height:8px;border-radius:50%;animation:pulseDot 2s infinite; }
+        .stat-hover:hover { transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.15); }
+        .action-hover:hover { transform:translateY(-3px);box-shadow:0 8px 24px var(--accent-glow); }
+        .bar-item:hover { background:var(--surface2); }
+
+        /* HERO GRADIENT */
+        .hero-bg {
+          background: linear-gradient(-45deg, #1a0533, #0a0a1f, #0f1a30, #1a0f20);
+          background-size: 400% 400%;
+          animation: gradientShift 12s ease infinite;
+        }
+
+        /* GRID LAYOUTS */
+        .grid-4 { display:grid;grid-template-columns:repeat(4,1fr);gap:14px; }
+        .grid-3 { display:grid;grid-template-columns:repeat(3,1fr);gap:16px; }
+        .grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+        .grid-main { display:grid;grid-template-columns:1fr 320px;gap:16px; }
+
+        @media(max-width:1100px) { .grid-4{grid-template-columns:repeat(2,1fr)} .grid-main{grid-template-columns:1fr} .aside-col{display:none} }
+        @media(max-width:700px) { .grid-3{grid-template-columns:repeat(2,1fr)} .grid-2{grid-template-columns:1fr} }
+        @media(max-width:480px) { .grid-4{grid-template-columns:repeat(2,1fr);gap:10px} .grid-3{grid-template-columns:repeat(2,1fr);gap:10px} }
       `}</style>
 
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
 
-        {/* HERO */}
-        <div style={{
-          position: 'relative',
-          background: 'linear-gradient(135deg, var(--bg2) 0%, var(--bg3) 100%)',
-          padding: '32px 24px 64px', overflow: 'hidden',
-        }}>
-          {particles.map((p, i) => (
-            <div key={i} className="particle" style={{
-              left: p.left, top: p.top,
-              width: p.width, height: p.height,
-              background: p.background, borderRadius: p.borderRadius,
-              opacity: p.opacity,
-              ['--pdur' as string]: p.animationDuration,
-              animationDelay: p.animationDelay,
-            } as React.CSSProperties} />
+        {/* ── HERO HEADER ──────────────────── */}
+        <div className="hero-bg" style={{ position: 'relative', padding: '36px 28px 80px', overflow: 'hidden' }}>
+          {/* Particles */}
+          {Array.from({ length: 16 }, (_, i) => (
+            <div key={i} style={{
+              position: 'absolute',
+              left: `${(i * 43 + 11) % 100}%`,
+              top: `${(i * 61 + 7) % 90}%`,
+              width: `${6 + (i % 4) * 4}px`,
+              height: `${6 + (i % 4) * 4}px`,
+              background: ['#6c63ff','#f472b6','#22c55e','#f59e0b','#38bdf8','#fb7185'][i % 6],
+              borderRadius: i % 3 === 0 ? '50%' : '3px',
+              opacity: 0.3,
+              animation: `particleFloat ${3 + (i % 3)}s ease-in-out ${i * 0.35}s infinite alternate`,
+              pointerEvents: 'none',
+            }} />
           ))}
-          <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, maxWidth: 1600, margin: '0 auto' }}>
             <div>
-              <p style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
                 {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
               </p>
-              <h1 style={{ fontSize: 'clamp(20px,4vw,34px)', fontWeight: 900, letterSpacing: -1, lineHeight: 1.2, marginBottom: 6 }}>
-                안녕하세요 👋 <span style={{ color: 'var(--accent)' }}>BizMatch PRO</span>
+              <h1 style={{ fontSize: 'clamp(24px,3.5vw,42px)', fontWeight: 900, letterSpacing: -1.5, color: '#fff', lineHeight: 1.15, marginBottom: 8 }}>
+                안녕하세요 👋<br />
+                <span style={{ background: 'linear-gradient(90deg,#a78bfa,#f472b6,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BizMatch PRO</span>
               </h1>
-              <p style={{ fontSize: 14, color: 'var(--text2)' }}>오늘도 최고의 사업자를 모집하세요 🔥</p>
+              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>오늘도 최고의 사업자를 모집하세요 🔥</p>
             </div>
-            <div style={{
-              background: 'var(--surface)', border: '1px solid var(--border2)',
-              borderRadius: 12, padding: '10px 16px', textAlign: 'center',
-              fontSize: 20, fontWeight: 800, color: 'var(--accent)',
-              letterSpacing: 1, boxShadow: '0 0 20px var(--accent-glow)',
-              whiteSpace: 'nowrap', flexShrink: 0,
-            }}>
-              {time}
-              <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, letterSpacing: 0 }}>LIVE</div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
+              {/* LIVE CLOCK */}
+              <div style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: '14px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: 2, fontVariantNumeric: 'tabular-nums' }}>{time}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 2, marginTop: 2 }}>LIVE · KST</div>
+              </div>
+              {/* MASCOT ROW */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {['🚀','💎','⭐'].map((e, i) => (
+                  <Mascot key={i} emoji={e} size={32} style={{ animationDelay: `${i * 0.6}s` }} />
+                ))}
+              </div>
             </div>
           </div>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, overflow: 'hidden', lineHeight: 0, pointerEvents: 'none' }}>
-            <svg className="wave-svg" viewBox="0 0 1440 60">
-              <path fill="#6c63ff" fillOpacity="0.1" d="M0,30 C180,60 360,0 540,30 C720,60 900,0 1080,30 C1260,60 1380,15 1440,30 L1440,60 L0,60 Z" />
+
+          {/* WAVE */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, pointerEvents: 'none' }}>
+            <svg viewBox="0 0 1440 70" style={{ display: 'block', animation: 'waveAnim 8s ease-in-out infinite alternate' }}>
+              <path fill="var(--bg)" d="M0,40 C200,70 400,10 600,40 C800,70 1000,10 1200,40 C1320,60 1400,30 1440,40 L1440,70 L0,70 Z" />
             </svg>
           </div>
         </div>
 
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px 100px' }}>
+        {/* ── CONTENT ──────────────────────── */}
+        <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 24px 120px' }}>
 
-          {/* STATS */}
-          <div className="stats-grid">
-            <StatCard label="총 리드" value={stats.totalLeads} icon="👥" color="#6c63ff" sub="전체 신청자" delay={0} />
-            <StatCard label="오늘 신규" value={stats.todayLeads} icon="⚡" color="#22c55e" sub="오늘 등록" delay={100} />
-            <StatCard label="연락 중" value={stats.contactingLeads} icon="📞" color="#f59e0b" sub="진행 중" delay={200} />
-            <StatCard label="전환율" value={`${stats.conversionRate}%`} icon="🎯" color="#f472b6" sub={`${stats.doneLeads}명 완료`} delay={300} />
+          {/* STAT CARDS — overlap wave */}
+          <div className="grid-4" style={{ marginTop: -44, position: 'relative', zIndex: 2, marginBottom: 24 }}>
+            {[
+              { label: '총 리드', val: stats.totalLeads, icon: '👥', color: '#6c63ff', sub: '전체 신청자', chart: weeklyData },
+              { label: '오늘 신규', val: stats.todayLeads, icon: '⚡', color: '#22c55e', sub: '오늘 등록', chart: weeklyData.map(v => Math.max(0, v - 1)) },
+              { label: '연락 중', val: stats.contactingLeads, icon: '📞', color: '#f59e0b', sub: '진행 중', chart: weeklyData.map(v => Math.round(v * 0.6)) },
+              { label: '전환율', val: stats.conversionRate, icon: '🎯', color: '#f472b6', sub: `${stats.doneLeads}명 완료`, chart: weeklyData.map(v => Math.round(v * 0.3)), suffix: '%' },
+            ].map((s, i) => (
+              <div key={s.label} className="card stat-hover" style={{ animationDelay: `${i * 80}ms`, transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: -30, right: -30, width: 100, height: 100, borderRadius: '50%', background: s.color, opacity: 0.08, filter: 'blur(24px)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <span style={{ fontSize: 26 }}>{s.icon}</span>
+                  {loading ? null : <MiniLineChart data={s.chart} color={s.color} />}
+                </div>
+                <div style={{ fontSize: 'clamp(28px,3vw,38px)', fontWeight: 900, letterSpacing: -1, color: s.color, lineHeight: 1 }}>
+                  {loading ? '—' : <Counter value={s.val} suffix={s.suffix} />}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600, marginTop: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{s.sub}</div>
+              </div>
+            ))}
           </div>
 
           {/* QUICK ACTIONS */}
-          <div className="actions-grid">
+          <div className="grid-3" style={{ marginBottom: 24 }}>
             {[
-              { href: '/builder', icon: '✨', label: '랜딩 만들기' },
-              { href: '/leads',   icon: '👥', label: '리드 목록' },
-              { href: '/messages',icon: '💬', label: '메시지' },
-              { href: '/settings',icon: '⚙️', label: '설정' },
+              { href: '/builder',  icon: '✨', label: '랜딩 만들기',  desc: '5분 만에 완성', color: '#6c63ff' },
+              { href: '/leads',    icon: '👥', label: '리드 목록',    desc: `총 ${stats.totalLeads}명 관리`, color: '#22c55e' },
+              { href: '/messages', icon: '💬', label: '자동화 메시지', desc: 'D+0~D+7 설정', color: '#f59e0b' },
             ].map((a, i) => (
-              <Link key={a.href} href={a.href} className="action-btn">
-                <span className="float-icon" style={{ fontSize: 28, animationDelay: `${i * 0.3}s` }}>{a.icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{a.label}</span>
+              <Link key={a.href} href={a.href} className="card action-hover" style={{
+                display: 'flex', alignItems: 'center', gap: 16, textDecoration: 'none', color: 'var(--text)',
+                transition: 'transform 0.2s, box-shadow 0.2s', animationDelay: `${i * 80}ms`,
+                border: `1px solid ${a.color}33`,
+              }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: `${a.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, boxShadow: `0 0 16px ${a.color}30` }}>
+                  <Mascot emoji={a.icon} size={26} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 2 }}>{a.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>{a.desc}</div>
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 18, color: a.color }}>→</div>
               </Link>
             ))}
           </div>
 
           {/* MAIN GRID */}
-          <div className="main-grid">
-            <div>
-              {/* FUNNEL */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 20, marginBottom: 18 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 15, fontWeight: 800 }}>
-                  <div className="pulse-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
-                  전환 퍼널
-                  <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto', fontWeight: 500 }}>실시간</span>
+          <div className="grid-main">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* WEEKLY BAR CHART */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                  <div className="pulse-dot" style={{ background: '#6c63ff', boxShadow: '0 0 8px #6c63ff' }} />
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>주간 신청 현황</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>최근 7일</span>
                 </div>
-                {loading
-                  ? [1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 48, marginBottom: 14, borderRadius: 10 }} />)
-                  : funnelData.map((f, i) => <FunnelBar key={f.label} {...f} delay={i * 150} />)
-                }
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100 }}>
+                  {weeklyData.map((v, i) => {
+                    const maxV = Math.max(...weeklyData, 1)
+                    const pct = (v / maxV) * 100
+                    const isToday = i === todayIdx
+                    return (
+                      <div key={i} className="bar-item" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 2px', borderRadius: 8, transition: 'background 0.2s', cursor: 'default' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#6c63ff' : 'var(--text3)' }}>{v}</div>
+                        <div style={{ width: '100%', height: `${Math.max(pct, 4)}%`, minHeight: 4, borderRadius: 6, background: isToday ? '#6c63ff' : 'var(--surface2)', transition: 'height 1s cubic-bezier(0.34,1.56,0.64,1)', boxShadow: isToday ? '0 0 12px #6c63ff66' : 'none' }} />
+                        <div style={{ fontSize: 10, color: isToday ? '#6c63ff' : 'var(--text3)', fontWeight: isToday ? 800 : 400 }}>{days[i]}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* FUNNEL */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+                  <div className="pulse-dot" style={{ background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }} />
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>전환 퍼널</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>실시간</span>
+                </div>
+                {loading ? [1,2,3].map(i => <div key={i} style={{ marginBottom: 14 }}>{skel(48)}</div>) : funnelData.map((f, i) => <FunnelBar key={f.label} {...f} delay={i * 150} />)}
               </div>
 
               {/* RECENT LEADS */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 20 }}>
+              <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800 }}>
-                    <div className="pulse-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: '#f472b6', boxShadow: '0 0 8px #f472b6' }} />
-                    최근 신청자
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="pulse-dot" style={{ background: '#f472b6', boxShadow: '0 0 8px #f472b6' }} />
+                    <span style={{ fontWeight: 800, fontSize: 15 }}>최근 신청자</span>
                   </div>
                   <Link href="/leads" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', fontWeight: 700 }}>전체 보기 →</Link>
                 </div>
-                {loading
-                  ? [1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 52, marginBottom: 8, borderRadius: 10 }} />)
-                  : recentLeads.length === 0
-                    ? (
-                      <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text3)' }}>
-                        <div style={{ fontSize: 40, marginBottom: 8 }}>📭</div>
-                        <p style={{ fontSize: 14 }}>아직 신청자가 없어요</p>
-                        <p style={{ fontSize: 12, marginTop: 4 }}>랜딩페이지를 만들어 공유해보세요!</p>
-                      </div>
-                    )
-                    : recentLeads.map((l, i) => <LeadRow key={l.id} lead={l} idx={i} />)
+                {loading ? [1,2,3,4].map(i => <div key={i} style={{ marginBottom: 10 }}>{skel(52)}</div>)
+                  : recentLeads.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text3)' }}>
+                      <Mascot emoji="📭" size={48} style={{ marginBottom: 12 }} />
+                      <p style={{ fontSize: 14, fontWeight: 600 }}>아직 신청자가 없어요</p>
+                      <p style={{ fontSize: 12, marginTop: 4 }}>랜딩페이지를 만들어 공유해보세요!</p>
+                    </div>
+                  ) : recentLeads.map(l => <LeadRow key={l.id} lead={l} />)
                 }
               </div>
             </div>
 
-            {/* PC ASIDE */}
-            <div className="pc-aside" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: '24px 16px', textAlign: 'center' }}>
-                <span className="char-float" style={{ fontSize: 64 }}>🚀</span>
-                <p style={{ fontSize: 13, fontWeight: 700, marginTop: 12, color: 'var(--text2)' }}>오늘도 파이팅!</p>
-                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 10 }}>
-                  {['⭐','💎','🏆'].map((e, i) => (
-                    <span key={i} className="float-icon" style={{ fontSize: 22, animationDelay: `${i * 0.4}s` }}>{e}</span>
+            {/* ASIDE */}
+            <div className="aside-col" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* DONUT */}
+              <div className="card" style={{ textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <div className="pulse-dot" style={{ background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>리드 현황</span>
+                </div>
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DonutChart segments={donutData} />
+                  <div style={{ position: 'absolute', textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>{stats.totalLeads}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 700 }}>TOTAL</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                  {donutData.map(d => (
+                    <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
+                      <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{d.label} {d.value}</span>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 20 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📊 이번 달</div>
-                {[
-                  { label: '신규 리드', val: stats.totalLeads, color: '#6c63ff' },
-                  { label: '연락 완료', val: stats.contactingLeads, color: '#f59e0b' },
-                  { label: '전환 완료', val: stats.doneLeads, color: '#22c55e' },
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
-                    <span style={{ color: 'var(--text2)', fontWeight: 600 }}>{r.label}</span>
-                    <span style={{ fontWeight: 900, color: r.color }}>{r.val}명</span>
-                  </div>
-                ))}
+              {/* MASCOT CARD */}
+              <div className="card" style={{
+                textAlign: 'center', padding: '28px 20px',
+                background: 'linear-gradient(135deg, var(--accent-bg), var(--surface))',
+                border: '1px solid var(--accent)',
+              }}>
+                <Mascot emoji="🚀" size={64} />
+                <p style={{ fontSize: 16, fontWeight: 900, marginTop: 14, marginBottom: 4 }}>오늘도 파이팅!</p>
+                <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>목표를 향해 달려가세요<br />당신은 할 수 있어요! 💪</p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 14 }}>
+                  {['⭐','💎','🏆','🎯'].map((e, i) => (
+                    <Mascot key={i} emoji={e} size={22} style={{ animationDelay: `${i * 0.5}s` }} />
+                  ))}
+                </div>
               </div>
 
-              <div style={{ background: 'linear-gradient(135deg, var(--accent-bg), transparent)', border: '1px solid var(--border)', borderRadius: 18, padding: 20 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>💡 오늘의 팁</div>
-                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
-                  신청 후 <strong style={{ color: 'var(--accent)' }}>1시간 이내</strong> 연락하면 전환율이 3배 높아져요!
+              {/* TIP CARD */}
+              <div className="card" style={{ background: 'linear-gradient(135deg, #6c63ff18, transparent)' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>💡 오늘의 팁</div>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.8 }}>
+                  신청 후 <strong style={{ color: '#6c63ff' }}>1시간 이내</strong> 연락하면<br />전환율이 <strong style={{ color: '#22c55e' }}>3배</strong> 높아져요!
                 </p>
+              </div>
+
+              {/* CONVERSION RATE */}
+              <div className="card">
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>📈 이번 달 성과</div>
+                {[
+                  { label: '신규 리드', val: stats.totalLeads, color: '#6c63ff', icon: '👥' },
+                  { label: '연락 완료', val: stats.contactingLeads, color: '#f59e0b', icon: '📞' },
+                  { label: '전환 완료', val: stats.doneLeads, color: '#22c55e', icon: '✅' },
+                ].map(r => (
+                  <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 16 }}>{r.icon}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600 }}>{r.label}</span>
+                    </div>
+                    <span style={{ fontWeight: 900, fontSize: 16, color: r.color }}>
+                      {loading ? '—' : <Counter value={r.val} />}
+                      <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 2 }}>명</span>
+                    </span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 14, padding: '12px', background: 'var(--bg3)', borderRadius: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, marginBottom: 4 }}>전환율</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: '#f472b6' }}>
+                    {loading ? '—' : <Counter value={stats.conversionRate} suffix="%" />}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
