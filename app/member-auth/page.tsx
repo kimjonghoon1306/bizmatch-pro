@@ -210,7 +210,7 @@ export default function MemberAuthPage() {
     if (!phone.trim()) { trigErr('전화번호를 입력하세요'); return }
     if (pw.length < 6) { trigErr('비밀번호 6자 이상'); return }
     if (pw !== pw2) { trigErr('비밀번호가 일치하지 않아요'); return }
-    const info: MemberInfo = { name, email, phone, joinDate: new Date().toLocaleDateString('ko-KR'), apiKey: apiKey.trim() }
+    const info: MemberInfo = { name, email, phone, joinDate: new Date().toLocaleDateString('ko-KR'), apiKey: '' }
     localStorage.setItem(MEMBER_PW_KEY, pw)
     localStorage.setItem(MEMBER_INFO_KEY, JSON.stringify(info))
     setRegDone(true)
@@ -418,10 +418,6 @@ export default function MemberAuthPage() {
                   <Field label="전화번호" value={phone} onChange={setPhone} placeholder="010-0000-0000" />
                   <Field label="비밀번호 (6자 이상)" value={pw} onChange={setPw} type="password" placeholder="비밀번호" />
                   <Field label="비밀번호 확인" value={pw2} onChange={setPw2} type="password" placeholder="비밀번호 재입력" />
-                  <div className="api-box">
-                    🔑 <strong>내 API 키</strong> (선택) — 개인 API 키를 입력하면<br />관리자와 완전히 분리된 개인 데이터로 운영돼요.
-                  </div>
-                  <Field label="내 API 키 (선택)" value={apiKey} onChange={setApiKey} placeholder="개인 API 키 (없으면 비워두세요)" />
                   <Btn onClick={doRegister}>🎉 가입하기</Btn>
                   <Btn onClick={() => go('login')} variant="ghost">이미 계정이 있으신가요?</Btn>
                 </>
