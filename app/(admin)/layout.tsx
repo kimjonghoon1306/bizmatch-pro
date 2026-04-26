@@ -128,7 +128,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="deco-text">오늘도 파이팅!</div>
           </div>
           <div className="sidebar-bottom">
-            <ThemeToggle />
             <Link href="/admin-control" onClick={() => setSideOpen(false)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
               borderRadius: 10, textDecoration: 'none', fontSize: 13, fontWeight: 700,
