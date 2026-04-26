@@ -120,9 +120,6 @@ export default function AdminControlPage() {
   const [popupSent, setPopupSent] = useState(false)
 
   // System state
-  const [apiVals, setApiVals] = useState<Record<string, string>>({})
-  const [visible, setVisible] = useState<Record<string, boolean>>({})
-  const [sysSaved, setSysSaved] = useState(false)
 
   const supabase = createClient()
 
@@ -605,76 +602,41 @@ export default function AdminControlPage() {
           {/* ── SYSTEM ───────────────────────────── */}
           {tab === 'system' && (
             <div>
-              <SectionTitle icon="🔧" title="시스템 설정" sub="API 키 및 서비스 연동 설정" />
+              <SectionTitle icon="🔧" title="시스템 설정" sub="환경변수는 Vercel 대시보드에서 설정하세요" />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <Card>
-                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 16 }}>🔑 API 키 설정</div>
-                  {[
-                    { key: 'supabase_url', label: 'Supabase URL', placeholder: 'https://xxx.supabase.co', link: 'https://supabase.com', linkText: '발급받기' },
-                    { key: 'supabase_anon', label: 'Supabase Anon Key', placeholder: 'eyJhbGc...', secret: true, link: 'https://supabase.com/dashboard', linkText: '대시보드' },
-                    { key: 'solapi_key', label: '솔라피 API Key', placeholder: 'SENS...', secret: true, link: 'https://solapi.com', linkText: '발급받기' },
-                    { key: 'solapi_secret', label: '솔라피 Secret', placeholder: '시크릿 키', secret: true, link: 'https://solapi.com', linkText: '발급받기' },
-                    { key: 'solapi_from', label: '발신 번호', placeholder: '010-0000-0000' },
-                    { key: 'kakao_key', label: '카카오 알림톡 Key', placeholder: '카카오 비즈 API 키', secret: true, link: 'https://business.kakao.com', linkText: '발급받기' },
-                  ].map(f => (
-                    <div key={f.key} style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                        <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)' }}>{f.label}</label>
-                        {f.link && (
-                          <a href={f.link} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
-                            🔗 {f.linkText}
-                          </a>
-                        )}
-                      </div>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type={f.secret && !visible[f.key] ? 'password' : 'text'}
-                          value={apiVals[f.key] ?? ''}
-                          onChange={e => setApiVals(prev => ({ ...prev, [f.key]: e.target.value }))}
-                          placeholder={f.placeholder}
-                          style={{ ...inputStyle, paddingRight: f.secret ? 44 : 15 }}
-                          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-                          onBlur={e => e.target.style.borderColor = 'var(--border)'}
-                        />
-                        {f.secret && (
-                          <button onClick={() => setVisible(p => ({ ...p, [f.key]: !p[f.key] }))} style={{
-                            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0,
-                          }}>
-                            {visible[f.key] ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={() => { setSysSaved(true); setTimeout(() => setSysSaved(false), 2500) }} style={{
-                    width: '100%', padding: '14px', borderRadius: 12, border: 'none',
-                    background: sysSaved ? 'var(--success)' : 'var(--accent)',
-                    color: '#fff', fontWeight: 800, fontSize: 15,
-                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s',
-                    boxShadow: '0 4px 16px var(--accent-glow)',
-                  }}>
-                    {sysSaved ? '✅ 저장 완료!' : '💾 저장하기'}
-                  </button>
+                <Card style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)' }}>
+                  <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--accent)', marginBottom: 12 }}>🔒 API 키 설정 방법</div>
+                  <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.8, marginBottom: 16 }}>
+                    API 키는 <strong style={{ color: 'var(--text)' }}>Vercel 환경변수</strong>에 설정해요.<br />
+                    사이트 UI에 키를 직접 입력하는 방식은 보안상 사용하지 않아요.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[
+                      { href: 'https://vercel.com/dashboard', icon: '🚀', label: 'Vercel 대시보드 → 환경변수 설정' },
+                      { href: 'https://supabase.com/dashboard', icon: '🗄️', label: 'Supabase 대시보드 → API 키 확인' },
+                      { href: 'https://solapi.com', icon: '💬', label: '솔라피 → 문자 API 키 발급' },
+                      { href: 'https://business.kakao.com', icon: '💛', label: '카카오 비즈 → 알림톡 키 발급' },
+                    ].map(l => (
+                      <a key={l.href} href={l.href} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border2)', color: 'var(--text)', textDecoration: 'none', fontWeight: 700, fontSize: 13, transition: 'all 0.15s' }}>
+                        <span style={{ fontSize: 18 }}>{l.icon}</span>
+                        <span>{l.label}</span>
+                        <span style={{ marginLeft: 'auto', color: 'var(--accent)', fontSize: 12 }}>→</span>
+                      </a>
+                    ))}
+                  </div>
                 </Card>
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <Card style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)' }}>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--accent)', marginBottom: 8 }}>🔒 보안 안내</div>
-                    <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
-                      API 키는 반드시 <code style={{ background: 'var(--surface)', padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>.env.local</code> 파일에 저장하세요. 절대 외부에 공개하지 마세요.
-                    </p>
-                  </Card>
                   <Card>
-                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>📄 .env.local 예시</div>
-                    <pre style={{ background: 'var(--bg)', borderRadius: 10, padding: 14, fontSize: 11, color: 'var(--text2)', lineHeight: 1.8, overflowX: 'auto', fontFamily: 'monospace' }}>
-{`NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-SOLAPI_API_KEY=...
-SOLAPI_API_SECRET=...
-SOLAPI_FROM=01000000000`}
-                    </pre>
+                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>📄 .env.local 설정 예시</div>
+                    <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10, lineHeight: 1.6 }}>
+                      아래 키를 <strong>.env.local</strong> 파일에 입력 후<br />Vercel 환경변수에 그대로 등록하세요.
+                    </p>
+                    <pre style={{ background: 'var(--bg)', borderRadius: 10, padding: 14, fontSize: 11, color: 'var(--text2)', lineHeight: 1.9, overflowX: 'auto', fontFamily: 'monospace' }}>{`NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+SOLAPI_API_KEY=
+SOLAPI_API_SECRET=
+SOLAPI_FROM=`}</pre>
                   </Card>
                   <Card>
                     <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🛠️ 시스템 정보</div>
@@ -699,4 +661,3 @@ SOLAPI_FROM=01000000000`}
     </>
   )
 }
-
