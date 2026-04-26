@@ -1,468 +1,460 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
-type Modal = 'login' | 'register' | 'findId' | 'findPw' | 'browse' |
-             'info_login' | 'info_register' | 'info_browse' | null
+// ── 회원 전용 localStorage 키 ──────────────────
+const MEMBER_KEY = 'bizmatch_member_auth'
+const MEMBER_PW_KEY = 'bizmatch_member_pw'
+const MEMBER_INFO_KEY = 'bizmatch_member_info'
 
-// ── 팝업 컴포넌트 ──────────────────────────────
-function InfoPopup({ title, content, emoji, onClose }: {
-  title: string; content: string; emoji: string; onClose: () => void
-}) {
+type Panel = 'home' | 'login' | 'register' | 'findId' | 'findPw' | 'mypage'
+
+interface MemberInfo {
+  name: string
+  email: string
+  phone: string
+  joinDate: string
+  apiKey: string
+}
+
+// ── Neural canvas bg ────────────────────────────
+function NeuralBg() {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const c = ref.current; if (!c) return
+    const ctx = c.getContext('2d'); if (!ctx) return
+    let w = c.width = window.innerWidth
+    let h = c.height = window.innerHeight
+    const pts = Array.from({length:55},()=>({
+      x:Math.random()*w, y:Math.random()*h,
+      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35, r:Math.random()*1.8+.5,
+    }))
+    let raf:number
+    const draw=()=>{
+      ctx.clearRect(0,0,w,h)
+      pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1})
+      pts.forEach((a,i)=>pts.slice(i+1).forEach(b=>{
+        const d=Math.hypot(a.x-b.x,a.y-b.y)
+        if(d<110){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=`rgba(139,92,246,${(1-d/110)*.2})`;ctx.lineWidth=.5;ctx.stroke()}
+      }))
+      pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(139,92,246,.45)';ctx.fill()})
+      raf=requestAnimationFrame(draw)
+    }
+    draw()
+    const onR=()=>{w=c.width=window.innerWidth;h=c.height=window.innerHeight}
+    window.addEventListener('resize',onR)
+    return ()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',onR)}
+  },[])
+  return <canvas ref={ref} style={{position:'fixed',inset:0,zIndex:0,pointerEvents:'none'}}/>
+}
+
+// ── Shared input ────────────────────────────────
+function Field({label,value,onChange,type='text',placeholder,readonly}:{label:string;value:string;onChange?:(v:string)=>void;type?:string;placeholder?:string;readonly?:boolean}) {
+  const [focused,setFocused]=useState(false)
+  const [showPw,setShowPw]=useState(false)
+  const isPw=type==='password'
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position:'fixed',inset:0,zIndex:200,
-        background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',
-        display:'flex',alignItems:'center',justifyContent:'center',padding:20,
-        animation:'fadeIn 0.2s ease',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background:'var(--surface)',border:'1px solid var(--border2)',
-          borderRadius:24,padding:'32px 28px',width:'100%',maxWidth:380,
-          boxShadow:'0 32px 80px rgba(0,0,0,0.5)',
-          animation:'popIn 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-        }}
-      >
-        <div style={{fontSize:48,textAlign:'center',marginBottom:16}}>{emoji}</div>
-        <h3 style={{fontSize:20,fontWeight:900,textAlign:'center',marginBottom:12,letterSpacing:-0.5}}>{title}</h3>
-        <p style={{fontSize:14,color:'var(--text2)',lineHeight:1.8,textAlign:'center',marginBottom:24}}>{content}</p>
-        <button onClick={onClose} style={{
-          width:'100%',padding:'14px',borderRadius:12,border:'none',
-          background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:15,
-          cursor:'pointer',fontFamily:'inherit',
-          boxShadow:'0 4px 16px var(--accent-glow)',
-        }}>확인했어요 ✓</button>
+    <div style={{marginBottom:14}}>
+      <label style={{display:'block',fontSize:11,fontWeight:800,color:'var(--text3)',letterSpacing:1.5,textTransform:'uppercase',marginBottom:6}}>{label}</label>
+      <div style={{position:'relative'}}>
+        <input
+          value={value} onChange={e=>onChange?.(e.target.value)} readOnly={readonly}
+          type={isPw&&!showPw?'password':type==='password'?'text':type}
+          placeholder={placeholder}
+          onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
+          style={{width:'100%',padding:isPw?'13px 44px 13px 15px':'13px 15px',background:readonly?'var(--bg3)':'var(--bg3)',border:`1.5px solid ${focused?'var(--accent)':'var(--border)'}`,borderRadius:12,fontFamily:'inherit',fontSize:15,color:'var(--text)',outline:'none',transition:'all 0.2s',boxShadow:focused?'0 0 0 3px var(--accent-glow)':'none',cursor:readonly?'default':'text'}}
+        />
+        {isPw&&!readonly&&<button type="button" onClick={()=>setShowPw(!showPw)} style={{position:'absolute',right:13,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--text3)',padding:0,lineHeight:1}}>{showPw?'🙈':'👁️'}</button>}
       </div>
     </div>
   )
 }
 
-// ── 로그인 모달 ────────────────────────────────
-function LoginModal({ onClose, onFindId, onFindPw }: {
-  onClose: () => void; onFindId: () => void; onFindPw: () => void
-}) {
-  const [email, setEmail] = useState('')
-  const [pw, setPw] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState('')
-  const [shake, setShake] = useState(false)
-
-  function handleLogin() {
-    if (!email.trim()) { triggerError('이메일을 입력하세요'); return }
-    if (!pw.trim()) { triggerError('비밀번호를 입력하세요'); return }
-    alert('준비 중이에요! Supabase Auth 연동 후 사용 가능해요 🚀')
+function Btn({children,onClick,variant='primary',disabled}:{children:React.ReactNode;onClick:()=>void;variant?:'primary'|'ghost'|'danger';disabled?:boolean}) {
+  const styles:{[k:string]:React.CSSProperties}={
+    primary:{background:'var(--accent)',color:'#fff',boxShadow:'0 6px 20px var(--accent-glow)'},
+    ghost:{background:'transparent',color:'var(--text2)',border:'1.5px solid var(--border2)'},
+    danger:{background:'var(--danger-bg)',color:'var(--danger)',border:'1px solid var(--danger)'},
   }
-
-  function triggerError(msg: string) {
-    setError(msg); setShake(true)
-    setTimeout(() => setShake(false), 600)
-    setTimeout(() => setError(''), 3000)
-  }
-
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,animation:'fadeIn 0.2s ease'}}>
-      <div onClick={e => e.stopPropagation()} className={shake ? 'shake' : ''} style={{background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:24,padding:'32px 28px',width:'100%',maxWidth:400,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',animation:'popIn 0.3s cubic-bezier(0.34,1.56,0.64,1)'}}>
-        <div style={{textAlign:'center',marginBottom:24}}>
-          <div style={{fontSize:40,marginBottom:8}}>🔐</div>
-          <h2 style={{fontSize:22,fontWeight:900,letterSpacing:-0.5,marginBottom:4}}>로그인</h2>
-          <p style={{fontSize:13,color:'var(--text2)'}}>BizMatch PRO에 오신걸 환영해요!</p>
-        </div>
-        {error && <div style={{background:'var(--danger-bg)',border:'1px solid var(--danger)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,color:'var(--danger)',fontWeight:600}}>⚠️ {error}</div>}
-        <div style={{marginBottom:14}}>
-          <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>이메일</label>
-          <input value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter'&&handleLogin()} type="email" placeholder="example@email.com" style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'14px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} />
-        </div>
-        <div style={{marginBottom:8}}>
-          <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>비밀번호</label>
-          <div style={{position:'relative'}}>
-            <input value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key==='Enter'&&handleLogin()} type={showPw?'text':'password'} placeholder="비밀번호 입력" style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'14px 44px 14px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} />
-            <button onClick={()=>setShowPw(!showPw)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'var(--text3)'}}>
-              {showPw?'🙈':'👁️'}
-            </button>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:16,marginBottom:20}}>
-          <button onClick={()=>{onClose();onFindId()}} style={{background:'none',border:'none',color:'var(--accent)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>아이디 찾기</button>
-          <button onClick={()=>{onClose();onFindPw()}} style={{background:'none',border:'none',color:'var(--accent)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>비밀번호 찾기</button>
-        </div>
-        <button onClick={handleLogin} style={{width:'100%',padding:'16px',borderRadius:14,border:'none',background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:16,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 20px var(--accent-glow)',marginBottom:12}}>
-          🚀 로그인
-        </button>
-        <button onClick={onClose} style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid var(--border2)',background:'transparent',color:'var(--text2)',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
-          닫기
-        </button>
-      </div>
-    </div>
+    <button onClick={onClick} disabled={disabled} style={{width:'100%',padding:'14px',borderRadius:13,border:'none',fontFamily:'inherit',fontSize:15,fontWeight:800,cursor:disabled?'not-allowed':'pointer',transition:'all 0.2s',marginBottom:10,opacity:disabled?.6:1,...styles[variant]}}>
+      {children}
+    </button>
   )
 }
 
-// ── 회원가입 모달 ──────────────────────────────
-function RegisterModal({ onClose }: { onClose: () => void }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [pw, setPw] = useState('')
-  const [pw2, setPw2] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState('')
-  const [shake, setShake] = useState(false)
-  const [done, setDone] = useState(false)
-
-  function handleRegister() {
-    if (!name.trim()) { triggerError('이름을 입력하세요'); return }
-    if (!email.includes('@')) { triggerError('올바른 이메일을 입력하세요'); return }
-    if (!phone.trim()) { triggerError('전화번호를 입력하세요'); return }
-    if (pw.length < 6) { triggerError('비밀번호는 6자 이상이어야 해요'); return }
-    if (pw !== pw2) { triggerError('비밀번호가 일치하지 않아요'); return }
-    setDone(true)
-  }
-
-  function triggerError(msg: string) {
-    setError(msg); setShake(true)
-    setTimeout(() => setShake(false), 600)
-    setTimeout(() => setError(''), 3000)
-  }
-
-  if (done) return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:24,padding:'40px 28px',width:'100%',maxWidth:380,textAlign:'center',animation:'popIn 0.3s cubic-bezier(0.34,1.56,0.64,1)'}}>
-        <div style={{fontSize:64,marginBottom:16}}>🎉</div>
-        <h2 style={{fontSize:22,fontWeight:900,marginBottom:8}}>가입 완료!</h2>
-        <p style={{fontSize:14,color:'var(--text2)',lineHeight:1.7,marginBottom:24}}>BizMatch PRO 회원이 되셨어요!<br/>이제 사업자 모집을 시작해보세요 🚀</p>
-        <button onClick={onClose} style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 16px var(--accent-glow)'}}>시작하기</button>
-      </div>
-    </div>
-  )
-
-  return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,overflowY:'auto',animation:'fadeIn 0.2s ease'}}>
-      <div onClick={e=>e.stopPropagation()} className={shake?'shake':''} style={{background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:24,padding:'32px 28px',width:'100%',maxWidth:420,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',animation:'popIn 0.3s cubic-bezier(0.34,1.56,0.64,1)',margin:'20px 0'}}>
-        <div style={{textAlign:'center',marginBottom:24}}>
-          <div style={{fontSize:40,marginBottom:8}}>✨</div>
-          <h2 style={{fontSize:22,fontWeight:900,letterSpacing:-0.5,marginBottom:4}}>회원가입</h2>
-          <p style={{fontSize:13,color:'var(--text2)'}}>함께 성장할 파트너가 되어요!</p>
-        </div>
-        {error && <div style={{background:'var(--danger-bg)',border:'1px solid var(--danger)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,color:'var(--danger)',fontWeight:600}}>⚠️ {error}</div>}
-        {[
-          {label:'이름',val:name,set:setName,placeholder:'홍길동',type:'text'},
-          {label:'이메일',val:email,set:setEmail,placeholder:'example@email.com',type:'email'},
-          {label:'전화번호',val:phone,set:setPhone,placeholder:'010-0000-0000',type:'tel'},
-        ].map(f => (
-          <div key={f.label} style={{marginBottom:14}}>
-            <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>{f.label}</label>
-            <input value={f.val} onChange={e=>f.set(e.target.value)} type={f.type} placeholder={f.placeholder} style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'13px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} />
-          </div>
-        ))}
-        <div style={{marginBottom:14}}>
-          <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>비밀번호 (6자 이상)</label>
-          <div style={{position:'relative'}}>
-            <input value={pw} onChange={e=>setPw(e.target.value)} type={showPw?'text':'password'} placeholder="비밀번호" style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'13px 44px 13px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} />
-            <button onClick={()=>setShowPw(!showPw)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'var(--text3)'}}>
-              {showPw?'🙈':'👁️'}
-            </button>
-          </div>
-        </div>
-        <div style={{marginBottom:20}}>
-          <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:6,textTransform:'uppercase',letterSpacing:0.5}}>비밀번호 확인</label>
-          <input value={pw2} onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleRegister()} type={showPw?'text':'password'} placeholder="비밀번호 재입력" style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'13px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} />
-        </div>
-        <button onClick={handleRegister} style={{width:'100%',padding:'16px',borderRadius:14,border:'none',background:'linear-gradient(135deg,#6c63ff,#f472b6)',color:'#fff',fontWeight:800,fontSize:16,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 6px 20px rgba(108,99,255,0.4)',marginBottom:12}}>
-          🎉 가입하기
-        </button>
-        <button onClick={onClose} style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid var(--border2)',background:'transparent',color:'var(--text2)',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>닫기</button>
-      </div>
-    </div>
-  )
+function ErrMsg({msg}:{msg:string}) {
+  if(!msg)return null
+  return <div style={{background:'var(--danger-bg)',border:'1px solid var(--danger)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,color:'var(--danger)',fontWeight:600,animation:'slideIn .2s ease'}}>⚠️ {msg}</div>
 }
 
-// ── 아이디/비번 찾기 모달 ─────────────────────
-function FindModal({ type, onClose }: { type: 'id'|'pw'; onClose: () => void }) {
-  const [val, setVal] = useState('')
-  const [done, setDone] = useState(false)
-
-  return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,animation:'fadeIn 0.2s ease'}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:24,padding:'32px 28px',width:'100%',maxWidth:380,boxShadow:'0 32px 80px rgba(0,0,0,0.5)',animation:'popIn 0.3s cubic-bezier(0.34,1.56,0.64,1)'}}>
-        <div style={{textAlign:'center',marginBottom:24}}>
-          <div style={{fontSize:40,marginBottom:8}}>{type==='id'?'🔍':'🔑'}</div>
-          <h2 style={{fontSize:20,fontWeight:900,marginBottom:4}}>{type==='id'?'아이디 찾기':'비밀번호 찾기'}</h2>
-          <p style={{fontSize:13,color:'var(--text2)'}}>{type==='id'?'가입 시 등록한 전화번호로 찾아드려요':'등록된 이메일로 재설정 링크를 보내드려요'}</p>
-        </div>
-        {done ? (
-          <div style={{background:'var(--success-bg)',border:'1px solid var(--success)',borderRadius:12,padding:'16px',textAlign:'center',marginBottom:20}}>
-            <div style={{fontSize:24,marginBottom:6}}>✅</div>
-            <p style={{fontSize:14,color:'var(--success)',fontWeight:700}}>{type==='id'?'전화번호로 아이디를 전송했어요!':'이메일로 재설정 링크를 보냈어요!'}</p>
-          </div>
-        ) : (
-          <div style={{marginBottom:20}}>
-            <label style={{display:'block',fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8,textTransform:'uppercase',letterSpacing:0.5}}>{type==='id'?'전화번호':'이메일'}</label>
-            <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&setDone(true)} type={type==='id'?'tel':'email'} placeholder={type==='id'?'010-0000-0000':'example@email.com'} style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:12,padding:'14px 16px',fontFamily:'inherit',fontSize:16,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'} autoFocus />
-          </div>
-        )}
-        {!done && (
-          <button onClick={()=>val.trim()&&setDone(true)} style={{width:'100%',padding:'14px',borderRadius:12,border:'none',background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 16px var(--accent-glow)',marginBottom:12}}>
-            {type==='id'?'🔍 아이디 찾기':'📧 링크 보내기'}
-          </button>
-        )}
-        <button onClick={onClose} style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid var(--border2)',background:'transparent',color:'var(--text2)',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>닫기</button>
-      </div>
-    </div>
-  )
+function OkMsg({msg}:{msg:string}) {
+  if(!msg)return null
+  return <div style={{background:'var(--success-bg)',border:'1px solid var(--success)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,color:'var(--success)',fontWeight:600,animation:'slideIn .2s ease'}}>✅ {msg}</div>
 }
 
-// ── 둘러보기 오버레이 ──────────────────────────
-function BrowseOverlay({ onLogin, onClose }: { onLogin: () => void; onClose: () => void }) {
-  return (
-    <div style={{position:'fixed',inset:0,zIndex:50,pointerEvents:'none'}}>
-      {/* 상단 안내 배너 */}
-      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:60,background:'linear-gradient(135deg,#6c63ff,#f472b6)',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',pointerEvents:'all'}}>
-        <p style={{color:'#fff',fontSize:13,fontWeight:700}}>👀 둘러보기 중 — 대부분 기능은 로그인 후 사용 가능해요</p>
-        <div style={{display:'flex',gap:8}}>
-          <button onClick={onLogin} style={{padding:'7px 16px',borderRadius:100,border:'none',background:'rgba(255,255,255,0.25)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>🔐 로그인</button>
-          <button onClick={onClose} style={{padding:'7px 12px',borderRadius:100,border:'none',background:'rgba(255,255,255,0.15)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
-        </div>
-      </div>
-      {/* 잠금 오버레이 (클릭 차단) */}
-      <div style={{position:'fixed',inset:0,top:48,zIndex:55,pointerEvents:'all',cursor:'not-allowed'}} onClick={e=>{e.preventDefault();e.stopPropagation()}} />
-    </div>
-  )
+function BackBtn({onClick}:{onClick:()=>void}) {
+  return <button onClick={onClick} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',fontSize:13,fontWeight:700,marginBottom:18,display:'flex',alignItems:'center',gap:5,padding:0,fontFamily:'inherit'}}>← 돌아가기</button>
 }
 
-// ── 메인 페이지 ────────────────────────────────
+// ── MAIN ────────────────────────────────────────
 export default function MemberAuthPage() {
-  const [modal, setModal] = useState<Modal>(null)
-  const [browsing, setBrowsing] = useState(false)
+  const [panel,setPanel]=useState<Panel>('home')
+  const [browsing,setBrowsing]=useState(false)
+  const [loggedIn,setLoggedIn]=useState(false)
+  const [memberInfo,setMemberInfo]=useState<MemberInfo|null>(null)
 
-  const particles = Array.from({length:24},(_,i)=>({
-    x:`${(i*43+17)%100}%`, y:`${(i*67+11)%100}%`,
-    size: 5+(i%5)*4,
-    color:['#6c63ff','#f472b6','#22c55e','#f59e0b','#38bdf8','#fb7185','#a78bfa','#34d399'][i%8],
-    dur: 3+(i%4), delay: i*0.25, shape: i%4,
-  }))
+  // form states
+  const [email,setEmail]=useState('')
+  const [pw,setPw]=useState('')
+  const [pw2,setPw2]=useState('')
+  const [name,setName]=useState('')
+  const [phone,setPhone]=useState('')
+  const [apiKey,setApiKey]=useState('')
+  const [findVal,setFindVal]=useState('')
+  const [error,setError]=useState('')
+  const [ok,setOk]=useState('')
+  const [regDone,setRegDone]=useState(false)
+  const [findDone,setFindDone]=useState(false)
 
-  const infoData = {
-    login: { emoji:'🔐', title:'로그인 안내', content:'가입한 이메일과 비밀번호로 로그인하세요.\n아이디/비밀번호를 잊으셨다면 찾기 기능을 이용하세요.\n로그인 후 모든 기능을 자유롭게 사용할 수 있어요!' },
-    register: { emoji:'✨', title:'회원가입 안내', content:'이름, 이메일, 전화번호, 비밀번호로 간편하게 가입하세요.\n가입 즉시 사업자 모집 랜딩페이지를 만들 수 있어요.\n무료로 시작하고 언제든지 업그레이드하세요!' },
-    browse: { emoji:'👀', title:'둘러보기 안내', content:'로그인 없이 BizMatch PRO를 구경할 수 있어요.\n단, 실제 기능(버튼 클릭, 데이터 입력)은 사용 불가해요.\n마음에 드셨다면 회원가입 후 시작해보세요!' },
+  // mypage edit
+  const [editName,setEditName]=useState('')
+  const [editPhone,setEditPhone]=useState('')
+  const [editApiKey,setEditApiKey]=useState('')
+  const [newPw,setNewPw]=useState('')
+  const [newPw2,setNewPw2]=useState('')
+
+  useEffect(()=>{
+    const ok=localStorage.getItem(MEMBER_KEY)==='true'
+    if(ok){
+      setLoggedIn(true)
+      const info=localStorage.getItem(MEMBER_INFO_KEY)
+      if(info) setMemberInfo(JSON.parse(info))
+    }
+  },[])
+
+  function reset(){setEmail('');setPw('');setPw2('');setName('');setPhone('');setApiKey('');setFindVal('');setError('');setOk('');setRegDone(false);setFindDone(false)}
+  function go(p:Panel){reset();setPanel(p)}
+
+  function trigErr(msg:string){setError(msg);setTimeout(()=>setError(''),3500)}
+  function trigOk(msg:string){setOk(msg);setTimeout(()=>setOk(''),3500)}
+
+  function doLogin(){
+    if(!email.includes('@')){trigErr('올바른 이메일을 입력하세요');return}
+    if(!pw.trim()){trigErr('비밀번호를 입력하세요');return}
+    const stored=localStorage.getItem(MEMBER_PW_KEY)
+    const info=localStorage.getItem(MEMBER_INFO_KEY)
+    if(!stored||!info){trigErr('가입된 계정이 없어요. 먼저 회원가입 해주세요');return}
+    const mi:MemberInfo=JSON.parse(info)
+    if(mi.email!==email||stored!==pw){trigErr('이메일 또는 비밀번호가 틀렸어요');return}
+    localStorage.setItem(MEMBER_KEY,'true')
+    setLoggedIn(true);setMemberInfo(mi)
+    trigOk('로그인 성공!');setTimeout(()=>go('home'),800)
   }
 
-  return (
+  function doRegister(){
+    if(!name.trim()){trigErr('이름을 입력하세요');return}
+    if(!email.includes('@')){trigErr('올바른 이메일을 입력하세요');return}
+    if(!phone.trim()){trigErr('전화번호를 입력하세요');return}
+    if(pw.length<6){trigErr('비밀번호 6자 이상');return}
+    if(pw!==pw2){trigErr('비밀번호가 일치하지 않아요');return}
+    const info:MemberInfo={name,email,phone,joinDate:new Date().toLocaleDateString('ko-KR'),apiKey:apiKey.trim()}
+    localStorage.setItem(MEMBER_PW_KEY,pw)
+    localStorage.setItem(MEMBER_INFO_KEY,JSON.stringify(info))
+    setRegDone(true)
+  }
+
+  function doFind(){if(!findVal.trim()){trigErr('입력하세요');return}setFindDone(true)}
+
+  function doLogout(){localStorage.removeItem(MEMBER_KEY);setLoggedIn(false);setMemberInfo(null);go('home')}
+
+  function saveMypage(){
+    if(!editName.trim()){trigErr('이름을 입력하세요');return}
+    if(newPw&&newPw.length<6){trigErr('새 비밀번호 6자 이상');return}
+    if(newPw&&newPw!==newPw2){trigErr('비밀번호가 일치하지 않아요');return}
+    const updated:MemberInfo={...memberInfo!,name:editName,phone:editPhone,apiKey:editApiKey}
+    localStorage.setItem(MEMBER_INFO_KEY,JSON.stringify(updated))
+    if(newPw) localStorage.setItem(MEMBER_PW_KEY,newPw)
+    setMemberInfo(updated);trigOk('저장되었어요!')
+    setNewPw('');setNewPw2('')
+  }
+
+  function openMypage(){
+    if(!memberInfo)return
+    setEditName(memberInfo.name);setEditPhone(memberInfo.phone);setEditApiKey(memberInfo.apiKey||'')
+    setNewPw('');setNewPw2('')
+    go('mypage')
+  }
+
+  return(
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&display=swap');
         *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-        body{background:#060612;font-family:'Outfit','Pretendard Variable',sans-serif}
+        body{background:var(--bg);color:var(--text);font-family:'Pretendard Variable','Pretendard',-apple-system,sans-serif}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes popIn{from{opacity:0;transform:scale(0.85) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
-        @keyframes gridScroll{0%{transform:translateY(0)}100%{transform:translateY(52px)}}
-        @keyframes orbFloat{0%{transform:scale(1);opacity:0.3}100%{transform:scale(1.3) translate(15px,-15px);opacity:0.6}}
-        @keyframes ptFloat{0%{transform:translateY(0) rotate(0deg) scale(1);opacity:0.3}100%{transform:translateY(-22px) rotate(200deg) scale(1.3);opacity:0.7}}
-        @keyframes svgSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes svgSpinRev{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
-        @keyframes heroFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-14px) rotate(2deg)}}
+        @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes popIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes appear{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes float1{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(2deg)}}
         @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-        @keyframes btnGlow{0%,100%{box-shadow:0 6px 20px var(--g1,rgba(108,99,255,0.4))}50%{box-shadow:0 8px 32px var(--g1,rgba(108,99,255,0.6)),0 0 60px var(--g1,rgba(108,99,255,0.2))}}
-        @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
-        @keyframes badgeFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-        .shake{animation:shake 0.5s ease both}
-
-        .page-root{
-          min-height:100vh;
-          background:radial-gradient(ellipse at 15% 40%,#1a0533 0%,#060612 55%),
-                     radial-gradient(ellipse at 85% 70%,#0c1a35 0%,transparent 55%),
-                     radial-gradient(ellipse at 50% 0%,#1a0a20 0%,transparent 40%);
-          display:flex;flex-direction:column;align-items:center;justify-content:center;
-          overflow:hidden;position:relative;padding:20px;
-        }
-        .grid-bg{position:absolute;inset:0;pointer-events:none;
-          background-image:linear-gradient(rgba(108,99,255,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(108,99,255,0.05) 1px,transparent 1px);
-          background-size:52px 52px;animation:gridScroll 25s linear infinite}
-        .orb{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;animation:orbFloat var(--dur) ease-in-out infinite alternate}
-        .pt{position:absolute;pointer-events:none;animation:ptFloat var(--dur) ease-in-out var(--dly) infinite alternate}
-        .svg-deco{position:absolute;pointer-events:none;opacity:0.1}
-        .main-card{position:relative;z-index:10;width:100%;max-width:480px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:32px;padding:44px 36px;backdrop-filter:blur(20px);box-shadow:0 32px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.08);animation:popIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both}
-        .hero-emoji{display:inline-block;animation:heroFloat 4s ease-in-out infinite;filter:drop-shadow(0 8px 24px rgba(108,99,255,0.5))}
-        .grad-text{background:linear-gradient(135deg,#a78bfa,#f472b6,#38bdf8);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 4s ease infinite}
-        .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(108,99,255,0.15);border:1px solid rgba(108,99,255,0.4);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:700;color:#a78bfa;animation:badgeFloat 2.5s ease-in-out infinite}
-        .badge-dot{width:6px;height:6px;border-radius:50%;background:#6c63ff;box-shadow:0 0 6px #6c63ff;animation:ptFloat 1.5s ease-in-out infinite alternate}
-
-        .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-        .auth-btn{padding:18px 12px;border-radius:18px;border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:15px;transition:all 0.2s;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:6px;animation:btnGlow 3s ease-in-out infinite}
-        .auth-btn:hover{transform:translateY(-3px) scale(1.02)}
-        .auth-btn:active{transform:scale(0.97)}
-        .auth-btn-icon{font-size:26px;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3))}
-
-        .btn-login{background:linear-gradient(135deg,#6c63ff,#8b5cf6);color:#fff;--g1:rgba(108,99,255,0.4)}
-        .btn-register{background:linear-gradient(135deg,#f472b6,#fb7185);color:#fff;--g1:rgba(244,114,182,0.4)}
-        .btn-browse{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12)!important;color:rgba(255,255,255,0.7);animation:none!important}
-        .btn-browse:hover{background:rgba(255,255,255,0.1);color:#fff}
-
-        .info-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.3);font-size:14px;transition:color 0.2s;position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%}
-        .info-btn:hover{color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1)}
-
-        .divider{display:flex;align-items:center;gap:12px;margin:16px 0}
-        .divider-line{flex:1;height:1px;background:rgba(255,255,255,0.08)}
-        .divider-text{font-size:12px;color:rgba(255,255,255,0.25);font-weight:600;white-space:nowrap}
-
-        .feature-row{display:flex;justify-content:center;gap:20px;margin-top:20px;flex-wrap:wrap}
-        .feature-item{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.4)}
-
-        .admin-fab{position:fixed;bottom:24px;right:24px;z-index:90;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;text-decoration:none;transition:all 0.2s;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
-        .admin-fab:hover{background:rgba(108,99,255,0.2);border-color:rgba(108,99,255,0.4);transform:scale(1.1)}
-
-        .theme-wrap{position:fixed;top:16px;right:16px;z-index:90}
-
-        @media(max-width:480px){
-          .main-card{padding:32px 20px;border-radius:24px}
-          .btn-row{gap:10px}
-          .auth-btn{padding:16px 10px;font-size:14px}
-        }
+        .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative}
+        .card{position:relative;z-index:10;width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:28px;padding:40px 36px;box-shadow:0 24px 64px rgba(0,0,0,0.12);animation:popIn .5s cubic-bezier(.34,1.56,.64,1) both}
+        .syne{font-family:'Syne',sans-serif}
+        .grad{background:linear-gradient(135deg,#8b5cf6,#ec4899,#f59e0b);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 5s ease infinite}
+        .tag{display:inline-flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border2);border-radius:100px;padding:5px 13px;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:18px}
+        .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:float1 2s infinite}
+        .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px}
+        .mbtn{padding:20px 14px;border-radius:18px;border:1.5px solid var(--border);background:var(--bg3);cursor:pointer;font-family:inherit;text-align:left;transition:all .2s;position:relative;overflow:hidden}
+        .mbtn:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px var(--accent-glow)}
+        .mbtn:active{transform:scale(.98)}
+        .micon{font-size:26px;display:block;margin-bottom:10px;animation:float1 3s ease-in-out infinite}
+        .mlbl{font-size:14px;font-weight:800;color:var(--text);display:block;margin-bottom:2px}
+        .mdesc{font-size:11px;color:var(--text3)}
+        .browse-btn{width:100%;padding:13px;border-radius:14px;border:1.5px dashed var(--border2);background:transparent;color:var(--text2);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+        .browse-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+        .info-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:100px;padding:3px 10px;margin-bottom:8px;cursor:pointer;transition:all .2s;user-select:none}
+        .info-pill:hover{color:var(--accent);border-color:var(--accent)}
+        .find-link{background:none;border:none;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;text-underline-offset:3px}
+        .browse-bar{position:fixed;top:0;left:0;right:0;z-index:300;background:linear-gradient(135deg,var(--accent),#ec4899);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .browse-lock{position:fixed;inset:0;top:46px;z-index:290;cursor:not-allowed}
+        .mypage-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#ec4899);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px;box-shadow:0 8px 24px var(--accent-glow)}
+        .section-title{font-size:13px;font-weight:800;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+        .api-hint{background:var(--accent-bg);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:14px}
+        @media(max-width:480px){.card{padding:28px 18px;border-radius:22px}.menu-grid{gap:9px}.mbtn{padding:16px 12px}}
       `}</style>
 
-      {/* THEME TOGGLE */}
-      <div className="theme-wrap"><ThemeToggle /></div>
+      <NeuralBg/>
 
-      {/* BROWSE OVERLAY */}
-      {browsing && (
-        <BrowseOverlay
-          onLogin={() => { setBrowsing(false); setModal('login') }}
-          onClose={() => setBrowsing(false)}
-        />
-      )}
-
-      {/* MODALS */}
-      {modal === 'login' && <LoginModal onClose={() => setModal(null)} onFindId={() => setModal('findId')} onFindPw={() => setModal('findPw')} />}
-      {modal === 'register' && <RegisterModal onClose={() => setModal(null)} />}
-      {modal === 'findId' && <FindModal type="id" onClose={() => setModal(null)} />}
-      {modal === 'findPw' && <FindModal type="pw" onClose={() => setModal(null)} />}
-      {modal === 'info_login' && <InfoPopup {...infoData.login} onClose={() => setModal(null)} />}
-      {modal === 'info_register' && <InfoPopup {...infoData.register} onClose={() => setModal(null)} />}
-      {modal === 'info_browse' && <InfoPopup {...infoData.browse} onClose={() => setModal(null)} />}
-
-      <div className="page-root">
-        <div className="grid-bg" />
-
-        {/* ORBS */}
-        <div className="orb" style={{width:500,height:500,top:'-15%',left:'-10%',background:'#6c63ff','--dur':'7s'} as React.CSSProperties} />
-        <div className="orb" style={{width:350,height:350,bottom:'-10%',right:'-8%',background:'#f472b6','--dur':'9s'} as React.CSSProperties} />
-        <div className="orb" style={{width:250,height:250,top:'40%',right:'15%',background:'#38bdf8','--dur':'5s'} as React.CSSProperties} />
-
-        {/* SVG DECOS */}
-        <svg className="svg-deco" style={{top:'8%',left:'6%',width:140,height:140,animation:'svgSpin 22s linear infinite'}} viewBox="0 0 140 140">
-          <polygon points="70,6 134,105 6,105" fill="none" stroke="#6c63ff" strokeWidth="2"/>
-          <polygon points="70,22 118,100 22,100" fill="none" stroke="#f472b6" strokeWidth="1"/>
-        </svg>
-        <svg className="svg-deco" style={{bottom:'10%',left:'4%',width:110,height:110,animation:'svgSpinRev 18s linear infinite'}} viewBox="0 0 110 110">
-          <rect x="8" y="8" width="94" height="94" fill="none" stroke="#38bdf8" strokeWidth="2" rx="10"/>
-          <rect x="22" y="22" width="66" height="66" fill="none" stroke="#f59e0b" strokeWidth="1" rx="5"/>
-        </svg>
-        <svg className="svg-deco" style={{top:'55%',right:'4%',width:90,height:90,animation:'svgSpin 14s linear infinite'}} viewBox="0 0 90 90">
-          <circle cx="45" cy="45" r="40" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="10 5"/>
-          <circle cx="45" cy="45" r="25" fill="none" stroke="#a78bfa" strokeWidth="1.5"/>
-        </svg>
-        <svg className="svg-deco" style={{top:'15%',right:'8%',width:70,height:70,animation:'svgSpinRev 10s linear infinite'}} viewBox="0 0 70 70">
-          <polygon points="35,3 67,52 3,52" fill="none" stroke="#fb7185" strokeWidth="2"/>
-        </svg>
-
-        {/* PARTICLES */}
-        {particles.map((p,i) => (
-          <div key={i} className="pt" style={{
-            left:p.x,top:p.y,width:p.size,height:p.size,
-            background:p.color,
-            borderRadius:p.shape===0?'50%':p.shape===1?'4px':p.shape===2?'2px':'30% 70% 70% 30%',
-            '--dur':`${p.dur}s`,'--dly':`${p.delay}s`,
-          } as React.CSSProperties}/>
-        ))}
-
-        {/* MAIN CARD */}
-        <div className="main-card">
-          {/* BADGE */}
-          <div style={{textAlign:'center',marginBottom:20}}>
-            <div className="badge">
-              <span className="badge-dot"/>
-              사업자 모집 자동화 플랫폼
-            </div>
-          </div>
-
-          {/* HERO */}
-          <div style={{textAlign:'center',marginBottom:28}}>
-            <div style={{marginBottom:12}}>
-              <span className="hero-emoji" style={{fontSize:68}}>🚀</span>
-            </div>
-            <h1 style={{fontSize:'clamp(26px,5vw,36px)',fontWeight:900,letterSpacing:-1.5,color:'#fff',lineHeight:1.15,marginBottom:8}}>
-              <span className="grad-text">BizMatch PRO</span>
-            </h1>
-            <p style={{fontSize:14,color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>
-              네트워크·프랜차이즈·창업 모집을<br/>스마트하게 자동화하세요
-            </p>
-          </div>
-
-          {/* MAIN BUTTONS */}
-          <div className="btn-row">
-            {/* 로그인 */}
-            <div style={{position:'relative'}}>
-              <button className="auth-btn btn-login" onClick={() => setModal('login')}>
-                <span className="auth-btn-icon">🔐</span>
-                로그인
-              </button>
-              <button className="info-btn" onClick={() => setModal('info_login')} title="로그인 안내">ℹ</button>
-            </div>
-            {/* 회원가입 */}
-            <div style={{position:'relative'}}>
-              <button className="auth-btn btn-register" onClick={() => setModal('register')}>
-                <span className="auth-btn-icon">✨</span>
-                회원가입
-              </button>
-              <button className="info-btn" onClick={() => setModal('info_register')} title="회원가입 안내">ℹ</button>
-            </div>
-          </div>
-
-          {/* 둘러보기 */}
-          <div style={{position:'relative'}}>
-            <button className="auth-btn btn-browse" style={{width:'100%'}} onClick={() => setBrowsing(true)}>
-              <span style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:20}}>👀</span>
-                로그인 없이 둘러보기
-              </span>
+      {/* THEME + 로그아웃/마이페이지 */}
+      <div style={{position:'fixed',top:14,right:14,zIndex:100,display:'flex',alignItems:'center',gap:8}}>
+        {loggedIn&&(
+          <>
+            <button onClick={openMypage} style={{padding:'7px 14px',borderRadius:100,background:'var(--surface)',border:'1px solid var(--border2)',color:'var(--text)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+              👤 {memberInfo?.name}
             </button>
-            <button className="info-btn" onClick={() => setModal('info_browse')} title="둘러보기 안내">ℹ</button>
-          </div>
-
-          {/* DIVIDER */}
-          <div className="divider">
-            <div className="divider-line"/>
-            <span className="divider-text">BizMatch PRO의 특별한 기능</span>
-            <div className="divider-line"/>
-          </div>
-
-          {/* FEATURES */}
-          <div className="feature-row">
-            {[
-              {icon:'📊',text:'리드 관리'},
-              {icon:'✨',text:'랜딩 빌더'},
-              {icon:'💬',text:'자동 메시지'},
-              {icon:'📈',text:'전환 분석'},
-            ].map(f => (
-              <div key={f.text} className="feature-item">
-                <span>{f.icon}</span>
-                <span>{f.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+            <button onClick={doLogout} style={{padding:'7px 12px',borderRadius:100,background:'var(--danger-bg)',border:'1px solid var(--danger)',color:'var(--danger)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+              나가기
+            </button>
+          </>
+        )}
+        <ThemeToggle/>
       </div>
 
       {/* 관리자 FAB */}
-      <Link href="/admin-login" className="admin-fab" title="관리자 로그인">
+      <Link href="/admin-login" style={{position:'fixed',bottom:20,right:20,zIndex:100,width:44,height:44,borderRadius:'50%',background:'var(--surface)',border:'1px solid var(--border2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,textDecoration:'none',boxShadow:'var(--shadow-sm)',transition:'all .2s'}} title="관리자 전용">
         ⚙️
       </Link>
+
+      {/* BROWSE OVERLAY */}
+      {browsing&&(
+        <>
+          <div className="browse-bar">
+            <p style={{color:'#fff',fontSize:13,fontWeight:700,flex:1}}>👀 둘러보기 중 — 실제 기능은 로그인 후 사용 가능해요</p>
+            <button onClick={()=>{setBrowsing(false);go('login')}} style={{padding:'6px 14px',borderRadius:100,background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>🔐 로그인</button>
+            <button onClick={()=>setBrowsing(false)} style={{padding:'6px 10px',borderRadius:100,background:'rgba(255,255,255,0.1)',border:'none',color:'#fff',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+          </div>
+          <div className="browse-lock" onClick={e=>{e.preventDefault();e.stopPropagation()}}/>
+        </>
+      )}
+
+      <div className="page" style={{background:'var(--bg)'}}>
+        <div className="card">
+
+          {/* HOME */}
+          {panel==='home'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <div className="tag"><span className="dot"/>사업자 모집 자동화 플랫폼</div>
+              <h1 className="syne" style={{fontSize:'clamp(28px,5vw,40px)',fontWeight:900,letterSpacing:-2,lineHeight:1.1,marginBottom:10}}>
+                당신의 사업을<br/><span className="grad">자동으로</span><br/>키우세요
+              </h1>
+              <p style={{fontSize:13,color:'var(--text2)',lineHeight:1.7,marginBottom:24}}>네트워크·프랜차이즈·창업 모집을<br/>스마트하게 자동화하는 플랫폼</p>
+
+              {loggedIn?(
+                <div style={{marginBottom:12}}>
+                  <div style={{background:'var(--accent-bg)',border:'1px solid var(--accent)',borderRadius:14,padding:'14px 16px',marginBottom:12,display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:20}}>👋</span>
+                    <div>
+                      <p style={{fontWeight:800,fontSize:15}}>{memberInfo?.name}님, 환영해요!</p>
+                      <p style={{fontSize:12,color:'var(--text2)'}}>가입일: {memberInfo?.joinDate}</p>
+                    </div>
+                  </div>
+                  <button onClick={openMypage} className="mbtn" style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'16px'}}>
+                    <span style={{fontSize:24}}>👤</span>
+                    <div>
+                      <span className="mlbl">마이페이지</span>
+                      <span className="mdesc">정보 수정 · API 키 관리</span>
+                    </div>
+                  </button>
+                </div>
+              ):(
+                <>
+                  <div className="menu-grid">
+                    <div>
+                      <div className="info-pill" onClick={()=>alert('가입한 이메일과 비밀번호로 로그인하세요.\n아이디/비번 찾기 기능도 제공해요.')}>ℹ️ 로그인이란?</div>
+                      <button className="mbtn" onClick={()=>go('login')}>
+                        <span className="micon" style={{animationDelay:'0s'}}>🔐</span>
+                        <span className="mlbl">로그인</span>
+                        <span className="mdesc">기존 계정으로 입장</span>
+                      </button>
+                    </div>
+                    <div>
+                      <div className="info-pill" onClick={()=>alert('이름, 이메일, 전화번호, 비밀번호와\n본인 API 키로 30초 만에 가입!\n무료로 시작하세요.')}>ℹ️ 회원가입이란?</div>
+                      <button className="mbtn" onClick={()=>go('register')}>
+                        <span className="micon" style={{animationDelay:'.4s'}}>✨</span>
+                        <span className="mlbl">회원가입</span>
+                        <span className="mdesc">지금 바로 시작하기</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="info-pill" onClick={()=>alert('로그인 없이 UI를 둘러볼 수 있어요.\n단, 버튼 클릭이나 데이터 입력은 불가해요.')}>ℹ️ 둘러보기란?</div>
+                    <button className="browse-btn" onClick={()=>{setBrowsing(true)}}>
+                      <span>👀</span> 로그인 없이 둘러보기
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <div style={{display:'flex',gap:14,justifyContent:'center',marginTop:20,flexWrap:'wrap'}}>
+                {['📊 리드 관리','✨ 랜딩 빌더','💬 자동 메시지','📈 전환 분석'].map(f=>(
+                  <span key={f} style={{fontSize:11,color:'var(--text3)',display:'flex',alignItems:'center',gap:4}}>{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LOGIN */}
+          {panel==='login'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <BackBtn onClick={()=>go('home')}/>
+              <div style={{fontSize:40,marginBottom:10}}>🔐</div>
+              <h2 className="syne" style={{fontSize:24,fontWeight:900,letterSpacing:-1,marginBottom:4}}>로그인</h2>
+              <p style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>다시 만나서 반가워요!</p>
+              <ErrMsg msg={error}/><OkMsg msg={ok}/>
+              <Field label="이메일" value={email} onChange={setEmail} type="email" placeholder="example@email.com"/>
+              <Field label="비밀번호" value={pw} onChange={setPw} type="password" placeholder="비밀번호 입력"/>
+              <div style={{display:'flex',gap:16,marginBottom:20}}>
+                <button className="find-link" onClick={()=>go('findId')}>아이디 찾기</button>
+                <button className="find-link" onClick={()=>go('findPw')}>비밀번호 찾기</button>
+              </div>
+              <Btn onClick={doLogin}>🚀 로그인</Btn>
+              <Btn onClick={()=>go('register')} variant="ghost">계정이 없으신가요? 회원가입</Btn>
+            </div>
+          )}
+
+          {/* REGISTER */}
+          {panel==='register'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <BackBtn onClick={()=>go('home')}/>
+              {regDone?(
+                <div style={{textAlign:'center',padding:'20px 0'}}>
+                  <div style={{fontSize:60,marginBottom:14}}>🎉</div>
+                  <h2 className="syne" style={{fontSize:22,fontWeight:900,marginBottom:8}}>가입 완료!</h2>
+                  <p style={{fontSize:14,color:'var(--text2)',lineHeight:1.7,marginBottom:24}}>BizMatch PRO 회원이 되셨어요!<br/>이제 사업자 모집을 시작해보세요 🚀</p>
+                  <Btn onClick={()=>go('login')}>🔐 로그인하기</Btn>
+                </div>
+              ):(
+                <>
+                  <div style={{fontSize:40,marginBottom:10}}>✨</div>
+                  <h2 className="syne" style={{fontSize:24,fontWeight:900,letterSpacing:-1,marginBottom:4}}>회원가입</h2>
+                  <p style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>함께 성장할 파트너가 되어요!</p>
+                  <ErrMsg msg={error}/>
+                  <Field label="이름" value={name} onChange={setName} placeholder="홍길동"/>
+                  <Field label="이메일" value={email} onChange={setEmail} type="email" placeholder="example@email.com"/>
+                  <Field label="전화번호" value={phone} onChange={setPhone} placeholder="010-0000-0000"/>
+                  <Field label="비밀번호 (6자 이상)" value={pw} onChange={setPw} type="password" placeholder="비밀번호"/>
+                  <Field label="비밀번호 확인" value={pw2} onChange={setPw2} type="password" placeholder="비밀번호 재입력"/>
+                  <div className="api-hint">
+                    🔑 <strong>내 API 키</strong> (선택) — 개인 Supabase/문자 API 키를 입력하면<br/>
+                    관리자와 완전히 분리된 개인 데이터로 운영돼요.
+                  </div>
+                  <Field label="내 API 키 (선택)" value={apiKey} onChange={setApiKey} placeholder="개인 API 키 입력 (없으면 비워두세요)"/>
+                  <Btn onClick={doRegister} color="primary">🎉 가입하기</Btn>
+                  <Btn onClick={()=>go('login')} variant="ghost">이미 계정이 있으신가요?</Btn>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* FIND ID */}
+          {panel==='findId'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <BackBtn onClick={()=>go('login')}/>
+              <div style={{fontSize:40,marginBottom:10}}>🔍</div>
+              <h2 className="syne" style={{fontSize:22,fontWeight:900,letterSpacing:-1,marginBottom:4}}>아이디 찾기</h2>
+              <p style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>가입 시 등록한 전화번호로 찾아드려요</p>
+              <ErrMsg msg={error}/>
+              {findDone?(
+                <div style={{background:'var(--success-bg)',border:'1px solid var(--success)',borderRadius:12,padding:'16px',textAlign:'center',marginBottom:16}}>
+                  <div style={{fontSize:32,marginBottom:8}}>✅</div>
+                  <p style={{fontWeight:800,fontSize:14,color:'var(--success)'}}>전화번호로 아이디를 전송했어요!</p>
+                </div>
+              ):(
+                <Field label="전화번호" value={findVal} onChange={setFindVal} placeholder="010-0000-0000"/>
+              )}
+              {!findDone&&<Btn onClick={doFind}>🔍 아이디 찾기</Btn>}
+              <Btn onClick={()=>go('login')} variant="ghost">로그인으로 돌아가기</Btn>
+            </div>
+          )}
+
+          {/* FIND PW */}
+          {panel==='findPw'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <BackBtn onClick={()=>go('login')}/>
+              <div style={{fontSize:40,marginBottom:10}}>🔑</div>
+              <h2 className="syne" style={{fontSize:22,fontWeight:900,letterSpacing:-1,marginBottom:4}}>비밀번호 찾기</h2>
+              <p style={{fontSize:13,color:'var(--text2)',marginBottom:24}}>가입한 이메일로 재설정 링크를 보내드려요</p>
+              <ErrMsg msg={error}/>
+              {findDone?(
+                <div style={{background:'var(--success-bg)',border:'1px solid var(--success)',borderRadius:12,padding:'16px',textAlign:'center',marginBottom:16}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📧</div>
+                  <p style={{fontWeight:800,fontSize:14,color:'var(--success)'}}>이메일로 재설정 링크를 보냈어요!</p>
+                </div>
+              ):(
+                <Field label="이메일" value={findVal} onChange={setFindVal} type="email" placeholder="가입한 이메일"/>
+              )}
+              {!findDone&&<Btn onClick={doFind}>📧 링크 보내기</Btn>}
+              <Btn onClick={()=>go('login')} variant="ghost">로그인으로 돌아가기</Btn>
+            </div>
+          )}
+
+          {/* MYPAGE */}
+          {panel==='mypage'&&(
+            <div style={{animation:'appear .4s ease both'}}>
+              <BackBtn onClick={()=>go('home')}/>
+              <div style={{textAlign:'center',marginBottom:20}}>
+                <div className="mypage-avatar">👤</div>
+                <h2 className="syne" style={{fontSize:22,fontWeight:900,letterSpacing:-1,marginBottom:4}}>마이페이지</h2>
+                <p style={{fontSize:13,color:'var(--text2)'}}>가입일: {memberInfo?.joinDate}</p>
+              </div>
+              <ErrMsg msg={error}/><OkMsg msg={ok}/>
+
+              <div className="section-title">📋 기본 정보</div>
+              <Field label="이름" value={editName} onChange={setEditName} placeholder="홍길동"/>
+              <Field label="이메일" value={memberInfo?.email||''} readonly/>
+              <Field label="전화번호" value={editPhone} onChange={setEditPhone} placeholder="010-0000-0000"/>
+
+              <div className="section-title">🔑 내 API 키 (개인 전용)</div>
+              <div className="api-hint">
+                여기에 입력한 API 키는 <strong>본인만 사용</strong>해요.<br/>
+                관리자의 API 키와 완전히 분리된 개인 데이터 공간이에요.
+              </div>
+              <Field label="내 Supabase/API 키" value={editApiKey} onChange={setEditApiKey} placeholder="개인 API 키 입력"/>
+
+              <div className="section-title">🔐 비밀번호 변경 (선택)</div>
+              <Field label="새 비밀번호 (6자 이상)" value={newPw} onChange={setNewPw} type="password" placeholder="변경하려면 입력"/>
+              <Field label="새 비밀번호 확인" value={newPw2} onChange={setNewPw2} type="password" placeholder="비밀번호 재입력"/>
+
+              <Btn onClick={saveMypage}>💾 저장하기</Btn>
+              <Btn onClick={doLogout} variant="danger">🚪 로그아웃</Btn>
+            </div>
+          )}
+
+        </div>
+      </div>
     </>
   )
 }
