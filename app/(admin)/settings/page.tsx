@@ -39,6 +39,7 @@ export default function SettingsPage() {
   }
 
   function handleSave() {
+    if (!loggedIn) { trigErr('로그인 후 저장 가능해요'); return }
     if (!name.trim()) { trigErr('이름을 입력하세요'); return }
     if (newPw && newPw.length < 6) { trigErr('비밀번호는 6자 이상이어야 해요'); return }
     if (newPw && newPw !== newPw2) { trigErr('비밀번호가 일치하지 않아요'); return }
@@ -48,15 +49,6 @@ export default function SettingsPage() {
     if (newPw) localStorage.setItem(MEMBER_PW_KEY, newPw)
     setNewPw(''); setNewPw2('')
     setSaved(true); setTimeout(() => setSaved(false), 2500)
-  }
-
-  if (!loggedIn) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text3)' }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>🔐</div>
-        <p style={{ fontSize: 15, fontWeight: 700 }}>로그인 후 이용 가능해요</p>
-      </div>
-    )
   }
 
   const inputStyle: React.CSSProperties = {
