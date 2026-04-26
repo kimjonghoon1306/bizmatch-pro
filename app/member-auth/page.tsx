@@ -15,7 +15,6 @@ interface MemberInfo {
   email: string
   phone: string
   joinDate: string
-  apiKey: string
 }
 
 function NeuralBg() {
@@ -168,7 +167,6 @@ export default function MemberAuthPage() {
   const [findDone, setFindDone] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
-  const [editApiKey, setEditApiKey] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')
 
@@ -210,7 +208,7 @@ export default function MemberAuthPage() {
     if (!phone.trim()) { trigErr('전화번호를 입력하세요'); return }
     if (pw.length < 6) { trigErr('비밀번호 6자 이상'); return }
     if (pw !== pw2) { trigErr('비밀번호가 일치하지 않아요'); return }
-    const info: MemberInfo = { name, email, phone, joinDate: new Date().toLocaleDateString('ko-KR'), apiKey: '' }
+    const info: MemberInfo = { name, email, phone, joinDate: new Date().toLocaleDateString('ko-KR') }
     localStorage.setItem(MEMBER_PW_KEY, pw)
     localStorage.setItem(MEMBER_INFO_KEY, JSON.stringify(info))
     setRegDone(true)
@@ -230,7 +228,7 @@ export default function MemberAuthPage() {
     if (!editName.trim()) { trigErr('이름을 입력하세요'); return }
     if (newPw && newPw.length < 6) { trigErr('새 비밀번호 6자 이상'); return }
     if (newPw && newPw !== newPw2) { trigErr('비밀번호가 일치하지 않아요'); return }
-    const updated: MemberInfo = { ...memberInfo!, name: editName, phone: editPhone, apiKey: editApiKey }
+    const updated: MemberInfo = { ...memberInfo!, name: editName, phone: editPhone }
     localStorage.setItem(MEMBER_INFO_KEY, JSON.stringify(updated))
     if (newPw) localStorage.setItem(MEMBER_PW_KEY, newPw)
     setMemberInfo(updated); trigOk('저장되었어요!')
@@ -478,12 +476,7 @@ export default function MemberAuthPage() {
               <Field label="이름" value={editName} onChange={setEditName} placeholder="홍길동" />
               <Field label="이메일" value={memberInfo?.email || ''} readonly />
               <Field label="전화번호" value={editPhone} onChange={setEditPhone} placeholder="010-0000-0000" />
-              <div className="sec-title">🔑 내 API 키 (개인 전용)</div>
-              <div className="api-box">
-                여기에 입력한 API 키는 <strong>본인만 사용</strong>해요.<br />
-                관리자의 API 키와 완전히 분리된 개인 데이터 공간이에요.
-              </div>
-              <Field label="내 API 키" value={editApiKey} onChange={setEditApiKey} placeholder="개인 API 키 입력" />
+
               <div className="sec-title">🔐 비밀번호 변경 (선택)</div>
               <Field label="새 비밀번호 (6자 이상)" value={newPw} onChange={setNewPw} type="password" placeholder="변경하려면 입력" />
               <Field label="새 비밀번호 확인" value={newPw2} onChange={setNewPw2} type="password" placeholder="비밀번호 재입력" />
