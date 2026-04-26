@@ -4,156 +4,344 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard,
-  Users,
-  PlusSquare,
-  MessageSquare,
-  Settings,
-  Menu,
-  X,
-  Zap,
-} from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-  { href: '/leads',     label: '리드 목록', icon: Users },
-  { href: '/builder',   label: '랜딩 만들기', icon: PlusSquare },
-  { href: '/messages',  label: '메시지 발송', icon: MessageSquare },
-  { href: '/settings',  label: '설정',      icon: Settings },
+  { href: '/dashboard', label: '대시보드', icon: '📊', mobileIcon: '📊' },
+  { href: '/leads',     label: '리드 목록',  icon: '👥', mobileIcon: '👥' },
+  { href: '/builder',   label: '랜딩 만들기', icon: '✨', mobileIcon: '✨' },
+  { href: '/messages',  label: '메시지',     icon: '💬', mobileIcon: '💬' },
+  { href: '/settings',  label: '설정',       icon: '⚙️', mobileIcon: '⚙️' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [sideOpen, setSideOpen] = useState(false)
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--text)' }}>
+    <>
+      <style>{`
+        .admin-root {
+          display: flex;
+          min-height: 100vh;
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Pretendard Variable', 'Pretendard', -apple-system, sans-serif;
+        }
 
-      {/* TOP BAR */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        background: 'var(--bg2)',
-        borderBottom: '1px solid var(--border)',
-        height: 60,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text2)', padding: 4, display: 'flex',
-            }}
-          >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Zap size={20} color="var(--accent)" fill="var(--accent)" />
-            <span style={{
-              fontWeight: 900, fontSize: 18, letterSpacing: -0.5,
-              background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>
-              BizMatch PRO
-            </span>
+        /* ── SIDEBAR ── */
+        .sidebar {
+          width: 220px;
+          flex-shrink: 0;
+          background: var(--bg2);
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          overflow-y: auto;
+          z-index: 40;
+          transition: transform 0.25s ease;
+        }
+        .sidebar-logo {
+          padding: 20px 18px 16px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .logo-icon {
+          width: 34px; height: 34px;
+          background: var(--accent);
+          border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px;
+          box-shadow: 0 4px 12px var(--accent-glow);
+          animation: logoPulse 3s ease-in-out infinite;
+        }
+        @keyframes logoPulse {
+          0%,100% { box-shadow: 0 4px 12px var(--accent-glow); }
+          50% { box-shadow: 0 4px 24px var(--accent-glow), 0 0 40px var(--accent-glow); }
+        }
+        .logo-text {
+          font-size: 15px; font-weight: 900; letter-spacing: -0.5px;
+          background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .logo-badge {
+          font-size: 9px; font-weight: 800;
+          background: var(--accent); color: #fff;
+          padding: 2px 6px; border-radius: 100px;
+          letter-spacing: 0.5px;
+        }
+        .sidebar-nav {
+          flex: 1;
+          padding: 12px 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .nav-link {
+          display: flex; align-items: center; gap: 10px;
+          padding: 11px 12px; border-radius: 10px;
+          text-decoration: none; font-size: 14px; font-weight: 600;
+          color: var(--text2);
+          transition: all 0.15s;
+          position: relative;
+          overflow: hidden;
+        }
+        .nav-link::before {
+          content: '';
+          position: absolute; inset: 0;
+          background: var(--accent);
+          opacity: 0; border-radius: 10px;
+          transition: opacity 0.15s;
+        }
+        .nav-link:hover::before { opacity: 0.06; }
+        .nav-link:hover { color: var(--text); }
+        .nav-link.active {
+          background: var(--accent-bg);
+          color: var(--accent);
+          font-weight: 700;
+        }
+        .nav-link.active .nav-dot {
+          opacity: 1;
+        }
+        .nav-dot {
+          width: 5px; height: 5px; border-radius: 50%;
+          background: var(--accent);
+          margin-left: auto; opacity: 0;
+          box-shadow: 0 0 6px var(--accent);
+        }
+        .nav-icon { font-size: 18px; flex-shrink: 0; }
+        .sidebar-bottom {
+          padding: 14px 12px;
+          border-top: 1px solid var(--border);
+        }
+        .version-badge {
+          font-size: 10px; color: var(--text3);
+          text-align: center; font-weight: 600;
+          padding: 6px;
+          background: var(--bg3); border-radius: 8px;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+          position: sticky; top: 0; z-index: 30;
+          height: 56px;
+          background: var(--bg2);
+          border-bottom: 1px solid var(--border);
+          display: flex; align-items: center;
+          padding: 0 20px;
+          gap: 12px;
+          backdrop-filter: blur(12px);
+        }
+        .hamburger {
+          display: none;
+          background: none; border: none;
+          cursor: pointer; color: var(--text2);
+          font-size: 22px; padding: 4px;
+          line-height: 1;
+        }
+        .topbar-title {
+          font-size: 15px; font-weight: 800;
+          flex: 1;
+        }
+        .topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+        /* ── CONTENT ── */
+        .content-wrap {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          overflow-x: hidden;
+        }
+        .content-main {
+          flex: 1;
+          overflow-y: auto;
+        }
+
+        /* ── BOTTOM NAV (mobile) ── */
+        .bottom-nav {
+          display: none;
+          position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+          background: var(--bg2);
+          border-top: 1px solid var(--border);
+          padding: 6px 0 env(safe-area-inset-bottom, 6px);
+        }
+        .bottom-nav-inner {
+          display: flex;
+        }
+        .bnav-item {
+          flex: 1;
+          display: flex; flex-direction: column;
+          align-items: center; gap: 2px;
+          padding: 6px 4px;
+          text-decoration: none;
+          color: var(--text3);
+          transition: color 0.15s;
+          font-size: 10px; font-weight: 700;
+        }
+        .bnav-item.active { color: var(--accent); }
+        .bnav-item.active .bnav-icon { transform: scale(1.2); }
+        .bnav-icon { font-size: 22px; transition: transform 0.2s; }
+
+        /* ── OVERLAY ── */
+        .sidebar-overlay {
+          display: none;
+          position: fixed; inset: 0; z-index: 39;
+          background: rgba(0,0,0,0.5);
+        }
+
+        /* ── MOBILE BREAKPOINT ── */
+        @media (max-width: 768px) {
+          .sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0;
+            transform: translateX(-100%);
+            z-index: 40;
+          }
+          .sidebar.open { transform: translateX(0); }
+          .sidebar-overlay.open { display: block; }
+          .hamburger { display: flex; align-items: center; }
+          .bottom-nav { display: block; }
+          .content-main { padding-bottom: 70px; }
+        }
+
+        /* ── DECORATIVE SIDEBAR ELEMENTS ── */
+        .sidebar-deco {
+          padding: 12px 12px 4px;
+        }
+        .deco-card {
+          background: linear-gradient(135deg, var(--accent-bg), transparent);
+          border: 1px solid var(--accent);
+          border-radius: 12px;
+          padding: 12px;
+          text-align: center;
+        }
+        .deco-char {
+          font-size: 32px;
+          animation: sideChar 3s ease-in-out infinite;
+          display: inline-block;
+        }
+        @keyframes sideChar {
+          0%,100% { transform: translateY(0) rotate(-5deg); }
+          50% { transform: translateY(-6px) rotate(5deg); }
+        }
+        .deco-text {
+          font-size: 11px; font-weight: 700;
+          color: var(--accent); margin-top: 4px;
+        }
+
+        /* ── STATS STRIP (topbar) ── */
+        .topbar-stats {
+          display: flex; gap: 16px; align-items: center;
+        }
+        .topbar-stat {
+          font-size: 12px; color: var(--text2); font-weight: 600;
+        }
+        .topbar-stat strong { color: var(--accent); }
+
+        @media (max-width: 600px) {
+          .topbar-stats { display: none; }
+        }
+      `}</style>
+
+      <div className="admin-root">
+
+        {/* SIDEBAR */}
+        <aside className={`sidebar${sideOpen ? ' open' : ''}`}>
+          {/* LOGO */}
+          <div className="sidebar-logo">
+            <div className="logo-icon">⚡</div>
+            <div>
+              <div className="logo-text">BizMatch</div>
+              <span className="logo-badge">PRO</span>
+            </div>
           </div>
-        </div>
-        <ThemeToggle />
-      </header>
 
-      {/* MOBILE DRAWER OVERLAY */}
-      {menuOpen && (
+          {/* NAV */}
+          <nav className="sidebar-nav">
+            {navItems.map(({ href, label, icon }) => {
+              const active = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`nav-link${active ? ' active' : ''}`}
+                  onClick={() => setSideOpen(false)}
+                >
+                  <span className="nav-icon">{icon}</span>
+                  <span>{label}</span>
+                  <span className="nav-dot" />
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* DECO CHARACTER */}
+          <div className="sidebar-deco">
+            <div className="deco-card">
+              <span className="deco-char">🚀</span>
+              <div className="deco-text">오늘도 파이팅!</div>
+            </div>
+          </div>
+
+          {/* BOTTOM */}
+          <div className="sidebar-bottom">
+            <ThemeToggle />
+            <div className="version-badge" style={{ marginTop: 10 }}>
+              BizMatch PRO v0.1.0
+            </div>
+          </div>
+        </aside>
+
+        {/* OVERLAY */}
         <div
-          onClick={() => setMenuOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 40,
-            background: 'rgba(0,0,0,0.5)',
-          }}
+          className={`sidebar-overlay${sideOpen ? ' open' : ''}`}
+          onClick={() => setSideOpen(false)}
         />
-      )}
 
-      {/* SIDEBAR DRAWER */}
-      <aside style={{
-        position: 'fixed', top: 60, left: 0, bottom: 0, zIndex: 45,
-        width: 240,
-        background: 'var(--bg2)',
-        borderRight: '1px solid var(--border)',
-        padding: '16px 12px',
-        transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.25s ease',
-        overflowY: 'auto',
-      }}>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMenuOpen(false)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  textDecoration: 'none',
-                  fontWeight: active ? 700 : 500,
-                  fontSize: 15,
-                  color: active ? 'var(--accent)' : 'var(--text2)',
-                  background: active ? 'var(--accent-bg)' : 'transparent',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <Icon size={18} />
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* CONTENT */}
+        <div className="content-wrap">
+          {/* TOP BAR */}
+          <header className="topbar">
+            <button className="hamburger" onClick={() => setSideOpen(!sideOpen)}>
+              {sideOpen ? '✕' : '☰'}
+            </button>
+            <div className="topbar-title">
+              {navItems.find(n => pathname === n.href || pathname.startsWith(n.href + '/'))?.icon}{' '}
+              {navItems.find(n => pathname === n.href || pathname.startsWith(n.href + '/'))?.label ?? '관리자'}
+            </div>
+            <div className="topbar-right">
+              <div className="topbar-stats">
+                <span className="topbar-stat">사업자 모집 <strong>자동화</strong></span>
+              </div>
+              <ThemeToggle />
+            </div>
+          </header>
 
-        <div style={{ paddingTop: 24, borderTop: '1px solid var(--border)', marginTop: 24 }}>
-          <p style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
-            BizMatch PRO v0.1.0
-          </p>
+          {/* MAIN */}
+          <main className="content-main">
+            {children}
+          </main>
         </div>
-      </aside>
 
-      {/* MAIN CONTENT */}
-      <main style={{ padding: '24px 20px 80px', maxWidth: 600, margin: '0 auto' }}>
-        {children}
-      </main>
-
-      {/* BOTTOM NAV (mobile) */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-        background: 'var(--bg2)',
-        borderTop: '1px solid var(--border)',
-        display: 'flex',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 3,
-                padding: '8px 4px',
-                textDecoration: 'none',
-                color: active ? 'var(--accent)' : 'var(--text3)',
-                transition: 'color 0.15s',
-              }}
-            >
-              <Icon size={20} />
-              <span style={{ fontSize: 10, fontWeight: 700 }}>{label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+        {/* BOTTOM NAV */}
+        <nav className="bottom-nav">
+          <div className="bottom-nav-inner">
+            {navItems.map(({ href, label, mobileIcon }) => {
+              const active = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link key={href} href={href} className={`bnav-item${active ? ' active' : ''}`}>
+                  <span className="bnav-icon">{mobileIcon}</span>
+                  <span>{label.length > 4 ? label.slice(0, 4) : label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+      </div>
+    </>
   )
 }
