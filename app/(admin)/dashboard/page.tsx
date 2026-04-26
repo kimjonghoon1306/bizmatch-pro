@@ -228,9 +228,7 @@ export default function DashboardPage() {
 
         /* HERO GRADIENT */
         .hero-bg {
-          background: linear-gradient(-45deg, #1a0533, #0a0a1f, #0f1a30, #1a0f20);
-          background-size: 400% 400%;
-          animation: gradientShift 12s ease infinite;
+          background: linear-gradient(135deg, var(--bg2), var(--bg3));
         }
 
         /* GRID LAYOUTS */
