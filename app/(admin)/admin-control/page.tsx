@@ -604,12 +604,43 @@ export default function AdminControlPage() {
             <div>
               <SectionTitle icon="🔧" title="시스템 설정" sub="환경변수는 Vercel 대시보드에서 설정하세요" />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <Card style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)' }}>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--accent)', marginBottom: 12 }}>🔒 API 키 설정 방법</div>
-                  <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.8, marginBottom: 16 }}>
-                    API 키는 <strong style={{ color: 'var(--text)' }}>Vercel 환경변수</strong>에 설정해요.<br />
-                    사이트 UI에 키를 직접 입력하는 방식은 보안상 사용하지 않아요.
-                  </p>
+                <Card>
+                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>🤖 AI API 키</div>
+                  <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.6 }}>관리자용 AI 키예요. 이 기기에만 저장돼요.</p>
+                  {[
+                    { key: 'admin_gemini', label: 'Gemini API Key', badge: '무료', color: '#22c55e', placeholder: 'AIza...', link: 'https://aistudio.google.com/app/apikey', icon: '🔵' },
+                    { key: 'admin_groq', label: 'Groq API Key (Llama 3)', badge: '무료', color: '#22c55e', placeholder: 'gsk_...', link: 'https://console.groq.com/keys', icon: '⚡' },
+                    { key: 'admin_openai', label: 'OpenAI API Key (GPT-4o)', badge: '유료', color: '#f59e0b', placeholder: 'sk-...', link: 'https://platform.openai.com/api-keys', icon: '🤖' },
+                  ].map(f => (
+                    <div key={f.key} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>{f.icon}</span>
+                          <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{f.label}</label>
+                          <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 100, background: `${f.color}22`, color: f.color }}>{f.badge}</span>
+                        </div>
+                        <a href={f.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>🔗 발급받기</a>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="password"
+                          placeholder={f.placeholder}
+                          defaultValue={typeof window !== 'undefined' ? localStorage.getItem(f.key) || '' : ''}
+                          onChange={e => { if (typeof window !== 'undefined') localStorage.setItem(f.key, e.target.value) }}
+                          style={{ width: '100%', background: 'var(--bg3)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '13px 15px', fontFamily: 'inherit', fontSize: 15, color: 'var(--text)', outline: 'none' }}
+                          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                          onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ height: 16 }} />
+                  <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)', borderRadius: 12, padding: '12px 14px' }}>
+                    <p style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)', marginBottom: 4 }}>🔒 Supabase/Vercel 설정 방법</p>
+                    <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.7 }}>
+                      Supabase URL, Anon Key는 <strong>Vercel 환경변수</strong>에 설정해요.
+                    </p>
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[
                       { href: 'https://vercel.com/dashboard', icon: '🚀', label: 'Vercel 대시보드 → 환경변수 설정' },
