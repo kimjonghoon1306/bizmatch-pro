@@ -1,4 +1,4 @@
-export type Theme = 'dark' | 'light' | 'pink'
+export type Theme = 'dark' | 'light' | 'yellow'
 
 export type LeadStatus = 'new' | 'contact' | 'done' | 'trash'
 
