@@ -124,7 +124,7 @@ export default function LeadsPage() {
             key={t.value}
             onClick={() => setTab(t.value)}
             style={{
-              padding: '7px 14px', borderRadius: 100, border: 'none',
+              padding: '7px 14px', borderRadius: 100,
               background: tab === t.value ? 'var(--accent)' : 'var(--surface)',
               color: tab === t.value ? '#fff' : 'var(--text2)',
               fontSize: 13, fontWeight: 700, cursor: 'pointer',
