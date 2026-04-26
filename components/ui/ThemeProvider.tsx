@@ -8,7 +8,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement
-    root.classList.remove('dark', 'light', 'pink')
+    root.classList.remove('dark', 'light', 'yellow')
     root.classList.add(theme)
   }, [theme])
 
