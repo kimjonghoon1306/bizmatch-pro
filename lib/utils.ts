@@ -16,13 +16,15 @@ export function formatRelative(date: string) {
 }
 
 export function generateSlug(title: string): string {
+  // 영문만 추출, 없으면 랜덤만 사용
   const base = title
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣]/g, '-')
+    .replace(/[^a-z0-9]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-  const rand = Math.random().toString(36).substring(2, 7)
-  return `${base}-${rand}`
+    .slice(0, 20)
+  const rand = Math.random().toString(36).substring(2, 8)
+  return base ? `${base}-${rand}` : `page-${rand}`
 }
 
 export const statusLabel: Record<LeadStatus, string> = {
