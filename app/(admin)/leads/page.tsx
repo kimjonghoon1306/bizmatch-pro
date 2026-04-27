@@ -23,12 +23,16 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
+  const [pages, setPages] = useState<{id:string;title:string;slug:string}[]>([])
+  const [pageFilter, setPageFilter] = useState<string>('all')
+
   const loadLeads = useCallback(async () => {
-    const { data } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setLeads(data ?? [])
+    const [{ data: leadsData }, { data: pagesData }] = await Promise.all([
+      supabase.from('leads').select('*').order('created_at', { ascending: false }),
+      supabase.from('landing_pages').select('id,title,slug').order('created_at', { ascending: false }),
+    ])
+    setLeads(leadsData ?? [])
+    setPages(pagesData ?? [])
     setLoading(false)
   }, [])
 
@@ -37,6 +41,7 @@ export default function LeadsPage() {
   useEffect(() => {
     let result = leads
     if (tab !== 'all') result = result.filter(l => l.status === tab)
+    if (pageFilter !== 'all') result = result.filter(l => l.landing_page_id === pageFilter)
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(l =>
@@ -46,7 +51,7 @@ export default function LeadsPage() {
       )
     }
     setFiltered(result)
-  }, [leads, tab, search])
+  }, [leads, tab, search, pageFilter])
 
   async function handleStatusChange(id: string, status: LeadStatus) {
     await supabase.from('leads').update({ status }).eq('id', id)
@@ -116,6 +121,19 @@ export default function LeadsPage() {
           onBlur={e => (e.target.style.borderColor = 'var(--border)')}
         />
       </div>
+
+      {/* 랜딩페이지 필터 */}
+      {pages.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <select value={pageFilter} onChange={e => setPageFilter(e.target.value)}
+            style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '11px 14px', fontFamily: 'inherit', fontSize: 14, color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
+            <option value="all">📄 전체 랜딩페이지</option>
+            {pages.map(p => (
+              <option key={p.id} value={p.id}>📌 {p.title} (/join/{p.slug})</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* FILTER TABS */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
