@@ -1,4 +1,4 @@
-export type Theme = 'dark' | 'light' | 'yellow'
+export type Theme = 'dark' | 'light' | 'pink'
 
 export type LeadStatus = 'new' | 'contact' | 'done' | 'trash'
 
@@ -21,6 +21,7 @@ export interface LandingPage {
   contact_phone: string | null
   offer_text: string | null
   fields: string[]
+  user_id: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -57,6 +58,7 @@ export interface AutomationSetting {
   name: string
   trigger_type: TriggerType
   message_template: string
+  user_id: string | null
   is_active: boolean
   created_at: string
 }
