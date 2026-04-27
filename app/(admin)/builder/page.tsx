@@ -48,7 +48,7 @@ function buildTemplateHtml(templateId: string, title: string, content: string): 
     if (!line.trim()) { htmlBody += '<br>'; continue }
     if (line.startsWith('## ')) {
       h2count++
-      htmlBody += `<h2 style="font-size:20px;font-weight:800;margin:28px 0 12px;color:${tpl.primary};display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:${tpl.primary};color:#fff;font-size:12px;font-weight:800;flex-shrink:0">${h2count}</span>${line.slice(3)}</h2>`
+      htmlBody += `<h2 style="font-size:20px;font-weight:800;margin:28px 0 12px;color:${tpl.primary};display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:${tpl.primary};color:#fff;font-size:12px;font-weight:800;flex-shrink:0">${h2count}</span>${line.replace(/^##\s*/, '')}</h2>`
     } else if (line.startsWith('[팁]')) {
       htmlBody += `<div style="background:${tpl.primary}15;border-left:4px solid ${tpl.primary};border-radius:0 10px 10px 0;padding:12px 16px;margin:12px 0;font-size:14px;color:${tpl.text}">💡 ${line.slice(4).trim()}</div>`
     } else if (line.startsWith('[주의]')) {
@@ -83,7 +83,8 @@ function buildTemplateHtml(templateId: string, title: string, content: string): 
       refHtml = `<div style="margin:28px 0"><h3 style="font-size:16px;font-weight:800;margin:0 0 12px;color:${tpl.primary}">🔗 참고자료</h3>${refLines.map(l => {
         const parts = l.replace(/^LINK\d+:\s*/, '').split('|')
         const name = parts[0]||''; const desc = parts[1]||''; const url = parts[2]||'#'
-        return `<a href="${url.trim()}" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:${tpl.primary}08;border:1px solid ${tpl.primary}25;border-radius:10px;text-decoration:none;margin-bottom:8px"><div><div style="font-weight:700;color:${tpl.primary};font-size:14px">${name.trim()}</div><div style="color:${tpl.text};opacity:0.6;font-size:12px;margin-top:2px">${desc.trim()}</div></div><span style="color:${tpl.primary};font-size:16px">→</span></a>`
+        const safeUrl = url.trim().match(/^https?:\/\//) ? url.trim() : '#'
+        return `<a href="${safeUrl}" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:${tpl.primary}08;border:1px solid ${tpl.primary}25;border-radius:10px;text-decoration:none;margin-bottom:8px"><div><div style="font-weight:700;color:${tpl.primary};font-size:14px">${name.trim()}</div><div style="color:${tpl.text};opacity:0.6;font-size:12px;margin-top:2px">${desc.trim()}</div></div><span style="color:${tpl.primary};font-size:16px">→</span></a>`
       }).join('')}</div>`
     }
   }
@@ -178,13 +179,17 @@ export default function BuilderPage() {
       }
       const data = await resp.json()
       const content = data.content || ''
-      // 첫 줄을 제목으로
+      // 제목 찾기: ## 없는 첫 줄 or 짧은 첫 줄
       const lines = content.split('\n').filter((l: string) => l.trim())
-      const firstLine = lines[0] || topic
-      setGeneratedTitle(firstLine.replace(/^#+\s*/, ''))
+      // ## 소제목이 아닌 첫 번째 줄을 제목으로
+      const titleLine = lines.find((l: string) => !l.startsWith('#') && !l.startsWith('---') && !l.startsWith('[') && l.length < 80) || topic
+      const cleanTitle = titleLine.replace(/^#+\s*/, '').trim()
+      // 본문 설명: 첫 문단 중 짧은 문장
+      const descLine = lines.find((l: string) => !l.startsWith('#') && !l.startsWith('---') && !l.startsWith('[') && l.length > 20 && l !== titleLine) || ''
+      setGeneratedTitle(cleanTitle)
       setGeneratedContent(content)
-      setTitle(firstLine.replace(/^#+\s*/, ''))
-      setDescription(lines.slice(1, 3).join(' ').slice(0, 100))
+      setTitle(cleanTitle)
+      setDescription(descLine.slice(0, 80))
       setStep('template')
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : 'AI 생성 중 오류가 발생했어요')
@@ -225,7 +230,7 @@ export default function BuilderPage() {
         <h2 style={{ fontSize: 24, fontWeight: 900, marginBottom: 8 }}>완성!</h2>
         <p style={{ color: 'var(--text2)', marginBottom: 28, fontSize: 14 }}>링크를 공유하세요!</p>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <span style={{ fontSize: 13, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+          <span style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>/join/{slug}</span>
           <button onClick={copyLink} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: 'none', background: copied ? 'var(--success)' : 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
             {copied ? <CheckCircle size={14} /> : <Copy size={14} />}{copied ? '복사됨!' : '복사'}
           </button>
