@@ -165,6 +165,8 @@ export default function AdminControlPage() {
   }
 
   const [editingPage, setEditingPage] = useState<string | null>(null)
+  const [landingView, setLandingView] = useState<'admin'|'members'>('admin')
+  const [selectedMember, setSelectedMember] = useState<string>('all')
   const [editTitle, setEditTitle] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editPhone, setEditPhone] = useState('')
@@ -430,14 +432,43 @@ export default function AdminControlPage() {
           {/* ── LANDING ──────────────────────────── */}
           {tab === 'landing' && (
             <div>
-              <SectionTitle icon="📄" title="랜딩 관리" sub="생성된 랜딩페이지를 관리하세요" />
+              <SectionTitle icon="📄" title="랜딩 관리" sub="관리자/회원 랜딩페이지를 분리 관리" />
+
+              {/* 카테고리 탭 */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20, background: 'var(--bg3)', borderRadius: 12, padding: 4 }}>
+                {[
+                  { id: 'admin', label: '🔧 관리자 랜딩' },
+                  { id: 'members', label: '👥 회원 랜딩' },
+                ].map(t => (
+                  <button key={t.id} onClick={() => setLandingView(t.id as 'admin'|'members')} style={{
+                    flex: 1, padding: '10px', borderRadius: 8, border: 'none',
+                    background: landingView === t.id ? 'var(--surface)' : 'transparent',
+                    color: landingView === t.id ? 'var(--text)' : 'var(--text3)',
+                    fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    boxShadow: landingView === t.id ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                    transition: 'all 0.2s',
+                  }}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* 회원 선택 (회원 탭일때) */}
+              {landingView === 'members' && (
+                <div style={{ marginBottom: 14 }}>
+                  <select value={selectedMember} onChange={e => setSelectedMember(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '11px 14px', fontFamily: 'inherit', fontSize: 14, color: 'var(--text)', outline: 'none', cursor: 'pointer' }}>
+                    <option value="all">👥 전체 회원 랜딩</option>
+                    {memberList.map(m => <option key={m} value={m}>👤 {m}</option>)}
+                  </select>
+                </div>
+              )}
+
               {loading ? <div style={{ color: 'var(--text3)' }}>로딩 중...</div> :
-                pages.length === 0 ? (
+                filteredPages.length === 0 ? (
                   <Card style={{ textAlign: 'center', padding: 60 }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
                     <p style={{ fontSize: 15, color: 'var(--text3)' }}>생성된 랜딩페이지가 없어요</p>
                   </Card>
-                ) : pages.map(p => (
+                ) : filteredPages.map(p => (
                   <Card key={p.id} style={{ marginBottom: 12 }}>
                     {editingPage === p.id ? (
                       <div>
