@@ -229,6 +229,13 @@ export default function AdminControlPage() {
     color: 'var(--text)', outline: 'none',
   }
 
+  const memberList = [...new Set(pages.filter(p => p.user_id && p.user_id !== 'admin').map(p => p.user_id as string))]
+  const filteredPages = pages.filter((p: typeof pages[0]) => {
+    if (landingView === 'admin') return !p.user_id || p.user_id === 'admin'
+    if (selectedMember === 'all') return p.user_id && p.user_id !== 'admin'
+    return p.user_id === selectedMember
+  })
+
   return (
     <>
       <style>{`
