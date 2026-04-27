@@ -366,7 +366,7 @@ export default function BuilderPage() {
             {[
               { label: '📌 제목', id: 'title', value: title, setter: setTitle as (v: string) => void, placeholder: '모집 페이지 제목', req: true },
               { label: '📝 설명', id: 'desc', value: description, setter: setDescription, placeholder: '간단한 설명', multi: true },
-              { label: '📞 담당자 연락처', id: 'phone', value: phone, setter: setPhone, placeholder: '010-0000-0000' },
+              { label: '📞 담당자 연락처 (선택)', id: 'phone', value: phone, setter: setPhone, placeholder: '없으면 비워두세요 (선택사항)' },
               { label: '🎁 무료 제공 혜택', id: 'offer', value: offer, setter: setOffer, placeholder: '예) 무료 PDF 제공' },
             ].map(f => (
               <div key={f.id} style={{ marginBottom: 14 }}>
