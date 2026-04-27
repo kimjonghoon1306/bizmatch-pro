@@ -264,21 +264,21 @@ export default function DashboardPage() {
 
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, maxWidth: 1600, margin: '0 auto' }}>
             <div>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
+              <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
                 {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
               </p>
-              <h1 style={{ fontSize: 'clamp(24px,3.5vw,42px)', fontWeight: 900, letterSpacing: -1.5, color: '#fff', lineHeight: 1.15, marginBottom: 8 }}>
+              <h1 style={{ fontSize: 'clamp(24px,3.5vw,42px)', fontWeight: 900, letterSpacing: -1.5, color: 'var(--text)', lineHeight: 1.15, marginBottom: 8 }}>
                 안녕하세요 👋<br />
                 <span style={{ background: 'linear-gradient(90deg,#a78bfa,#f472b6,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BizMatch PRO</span>
               </h1>
-              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>오늘도 최고의 사업자를 모집하세요 🔥</p>
+              <p style={{ fontSize: 15, color: 'var(--text2)', fontWeight: 500 }}>오늘도 최고의 사업자를 모집하세요 🔥</p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
               {/* LIVE CLOCK */}
               <div style={{ background: 'var(--surface)', backdropFilter: 'blur(12px)', border: '1px solid var(--border2)', borderRadius: 16, padding: '14px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: 2, fontVariantNumeric: 'tabular-nums' }}>{time}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 2, marginTop: 2 }}>LIVE · KST</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: 2, fontVariantNumeric: 'tabular-nums' }}>{time}</div>
+                <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 700, letterSpacing: 2, marginTop: 2 }}>LIVE · KST</div>
               </div>
               {/* MASCOT ROW */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
