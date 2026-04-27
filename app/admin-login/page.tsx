@@ -272,19 +272,12 @@ export default function AdminLoginPage() {
           </div>
 
           {/* 탭 */}
-          <div className="tabs">
-            <button className={`tab${tab === 'login' ? ' on' : ''}`} onClick={() => switchTab('login')}>
-              🔐 로그인
-            </button>
-            <button className={`tab${tab === 'changePw' ? ' on' : ''}`} onClick={() => switchTab('changePw')}>
-              🔑 비번 변경
-            </button>
-          </div>
+
 
           {error && <div className="err">⚠️ {error}</div>}
 
           {/* 로그인 */}
-          {tab === 'login' && (
+          {(
             success ? (
               <div className="success-wrap">
                 <div style={{ fontSize:56,marginBottom:12 }}>✅</div>
@@ -320,45 +313,7 @@ export default function AdminLoginPage() {
             )
           )}
 
-          {/* 비번 변경 */}
-          {tab === 'changePw' && (
-            pwChanged ? (
-              <div className="changed-wrap">
-                <div style={{ fontSize:32,marginBottom:8 }}>✅</div>
-                <p style={{ fontWeight:800,fontSize:15,color:'var(--success)' }}>비밀번호가 변경되었어요!</p>
-              </div>
-            ) : (
-              <>
-                {['현재 비밀번호', '새 비밀번호 (4자 이상)', '새 비밀번호 확인'].map((lbl, i) => {
-                  const vals = [pw, newPw, newPw2]
-                  const setters = [setPw, setNewPw, setNewPw2]
-                  return (
-                    <div key={lbl} className="field">
-                      <label>{lbl}</label>
-                      <div className="input-wrap">
-                        <input
-                          className="inp"
-                          type={showNew ? 'text' : 'password'}
-                          value={vals[i]}
-                          onChange={e => setters[i](e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleChangePw()}
-                          placeholder={lbl}
-                        />
-                        {i === 0 && (
-                          <button className="eye" onClick={() => setShowNew(!showNew)} type="button">
-                            {showNew ? '🙈' : '👁️'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-                <button className="btn-primary" onClick={handleChangePw}>
-                  🔑 비밀번호 변경하기
-                </button>
-              </>
-            )
-          )}
+
 
           {/* 구분선 */}
           <div className="divider">
