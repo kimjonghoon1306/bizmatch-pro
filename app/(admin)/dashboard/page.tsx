@@ -276,7 +276,7 @@ export default function DashboardPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
               {/* LIVE CLOCK */}
-              <div style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: '14px 20px', textAlign: 'center' }}>
+              <div style={{ background: 'var(--surface)', backdropFilter: 'blur(12px)', border: '1px solid var(--border2)', borderRadius: 16, padding: '14px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: 2, fontVariantNumeric: 'tabular-nums' }}>{time}</div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 2, marginTop: 2 }}>LIVE · KST</div>
               </div>
