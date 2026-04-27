@@ -164,11 +164,27 @@ export default function AdminControlPage() {
     setAutomations(prev => prev.map(a => a.id === id ? { ...a, is_active: !current } : a))
   }
 
+  const [editingPage, setEditingPage] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editOffer, setEditOffer] = useState('')
   const [curPw, setCurPw] = useState('')
   const [newAdminPw, setNewAdminPw] = useState('')
   const [newAdminPw2, setNewAdminPw2] = useState('')
   const [pwChanged, setPwChanged] = useState(false)
   const [pwError, setPwError] = useState('')
+
+  async function savePage(id: string) {
+    await supabase.from('landing_pages').update({
+      title: editTitle,
+      description: editDesc || null,
+      contact_phone: editPhone || null,
+      offer_text: editOffer || null,
+    }).eq('id', id)
+    setPages(prev => prev.map(p => p.id === id ? { ...p, title: editTitle, description: editDesc, contact_phone: editPhone, offer_text: editOffer } : p))
+    setEditingPage(null)
+  }
 
   function handleChangePw() {
     const stored = typeof window !== 'undefined' ? (localStorage.getItem('bizmatch_admin_pw') || '123456') : '123456'
@@ -423,35 +439,60 @@ export default function AdminControlPage() {
                   </Card>
                 ) : pages.map(p => (
                   <Card key={p.id} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 16, fontWeight: 800 }}>{p.title}</span>
-                          <div style={{
-                            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
-                            background: p.is_active ? 'var(--success-bg)' : 'var(--danger-bg)',
-                            color: p.is_active ? 'var(--success)' : 'var(--danger)',
-                          }}>{p.is_active ? '활성' : '비활성'}</div>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>
-                          🔗 /join/{p.slug} · {categoryLabel[p.category as keyof typeof categoryLabel]}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-                          수집 항목: {(p.fields as string[]).join(', ')}
+                    {editingPage === p.id ? (
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 14 }}>✏️ 내용 수정</div>
+                        {[
+                          { label: '제목', val: editTitle, set: setEditTitle, ph: '랜딩 제목' },
+                          { label: '설명', val: editDesc, set: setEditDesc, ph: '설명 (선택)' },
+                          { label: '담당자 연락처', val: editPhone, set: setEditPhone, ph: '010-0000-0000 (선택)' },
+                          { label: '혜택 문구', val: editOffer, set: setEditOffer, ph: '무료 PDF 제공 등 (선택)' },
+                        ].map(f => (
+                          <div key={f.label} style={{ marginBottom: 12 }}>
+                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 5 }}>{f.label}</label>
+                            <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+                              style={{ width: '100%', background: 'var(--bg3)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '11px 13px', fontFamily: 'inherit', fontSize: 14, color: 'var(--text)', outline: 'none' }}
+                              onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                              onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="action-sm" onClick={() => setEditingPage(null)}>취소</button>
+                          <button onClick={() => savePage(p.id)} style={{ flex: 1, padding: '9px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>💾 저장</button>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                        <button className="action-sm" onClick={() => window.open(`/join/${p.slug}`, '_blank')}>미리보기</button>
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/join/${p.slug}`) }}
-                          className="action-sm"
-                        >링크 복사</button>
-                        <button className="action-sm" onClick={() => togglePage(p.id, p.is_active)}>
-                          {p.is_active ? '비활성화' : '활성화'}
-                        </button>
-                        <button className="action-sm action-danger" onClick={() => deletePage(p.id)}>삭제</button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 16, fontWeight: 800 }}>{p.title}</span>
+                            <div style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, background: p.is_active ? 'var(--success-bg)' : 'var(--danger-bg)', color: p.is_active ? 'var(--success)' : 'var(--danger)' }}>
+                              {p.is_active ? '활성' : '비활성'}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
+                            🔗 /join/{p.slug} · {categoryLabel[p.category as keyof typeof categoryLabel]}
+                          </div>
+                          {p.contact_phone && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 2 }}>📞 {p.contact_phone}</div>}
+                          <div style={{ fontSize: 12, color: 'var(--text2)' }}>수집: {(p.fields as string[]).join(', ')}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+                          <button className="action-sm" onClick={() => window.open(`/join/${p.slug}`, '_blank')}>미리보기</button>
+                          <button className="action-sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/join/${p.slug}`) }}>링크 복사</button>
+                          <button className="action-sm" onClick={() => {
+                            setEditingPage(p.id)
+                            setEditTitle(p.title)
+                            setEditDesc(p.description || '')
+                            setEditPhone(p.contact_phone || '')
+                            setEditOffer(p.offer_text || '')
+                          }}>✏️ 수정</button>
+                          <button className="action-sm" onClick={() => togglePage(p.id, p.is_active)}>
+                            {p.is_active ? '비활성화' : '활성화'}
+                          </button>
+                          <button className="action-sm action-danger" onClick={() => deletePage(p.id)}>🗑️ 삭제</button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </Card>
                 ))
               }
