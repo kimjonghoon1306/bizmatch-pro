@@ -164,6 +164,24 @@ export default function AdminControlPage() {
     setAutomations(prev => prev.map(a => a.id === id ? { ...a, is_active: !current } : a))
   }
 
+  const [curPw, setCurPw] = useState('')
+  const [newAdminPw, setNewAdminPw] = useState('')
+  const [newAdminPw2, setNewAdminPw2] = useState('')
+  const [pwChanged, setPwChanged] = useState(false)
+  const [pwError, setPwError] = useState('')
+
+  function handleChangePw() {
+    const stored = typeof window !== 'undefined' ? (localStorage.getItem('bizmatch_admin_pw') || '123456') : '123456'
+    if (!curPw.trim()) { setPwError('현재 비밀번호를 입력하세요'); return }
+    if (curPw !== stored) { setPwError('현재 비밀번호가 틀렸어요'); setCurPw(''); return }
+    if (newAdminPw.length < 4) { setPwError('새 비밀번호는 4자 이상'); return }
+    if (newAdminPw !== newAdminPw2) { setPwError('비밀번호가 일치하지 않아요'); return }
+    localStorage.setItem('bizmatch_admin_pw', newAdminPw)
+    setPwChanged(true); setCurPw(''); setNewAdminPw(''); setNewAdminPw2(''); setPwError('')
+    setTimeout(() => setPwChanged(false), 3000)
+  }
+
+
   function sendPopup() {
     if (!popupTitle.trim() || !popupContent.trim()) return
     setPopupSent(true)
@@ -299,6 +317,23 @@ export default function AdminControlPage() {
                     ))
                   }
                 </Card>
+
+              <Card style={{ gridColumn: '1 / -1', marginTop: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 14 }}>🔑 관리자 비밀번호 변경</div>
+                {pwChanged && <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--success)', fontWeight: 700 }}>✅ 변경 완료!</div>}
+                {pwError && <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--danger)', fontWeight: 600 }}>⚠️ {pwError}</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 14 }}>
+                  {[{label:'현재 비밀번호',val:curPw,set:setCurPw},{label:'새 비밀번호(4자↑)',val:newAdminPw,set:setNewAdminPw},{label:'새 비밀번호 확인',val:newAdminPw2,set:setNewAdminPw2}].map(f=>(
+                    <div key={f.label}>
+                      <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--text2)',marginBottom:5}}>{f.label}</label>
+                      <input type="password" value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.label} style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--border)',borderRadius:10,padding:'11px 13px',fontFamily:'inherit',fontSize:14,color:'var(--text)',outline:'none'}} onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--border)'}/>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={handleChangePw} style={{padding:'12px 24px',borderRadius:10,border:'none',background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:14,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 14px var(--accent-glow)'}}>
+                  🔑 비밀번호 변경하기
+                </button>
+              </Card>
               </div>
             </div>
           )}
@@ -634,7 +669,10 @@ export default function AdminControlPage() {
                       </div>
                     </div>
                   ))}
-                  <div style={{ height: 16 }} />
+                  <button onClick={() => { alert('✅ 저장되었어요!') }} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, marginBottom: 8, boxShadow: '0 4px 14px var(--accent-glow)' }}>
+                    💾 AI 키 저장하기
+                  </button>
+                  <div style={{ height: 8 }} />
                   <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)', borderRadius: 12, padding: '12px 14px' }}>
                     <p style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)', marginBottom: 4 }}>🔒 Supabase/Vercel 설정 방법</p>
                     <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.7 }}>
