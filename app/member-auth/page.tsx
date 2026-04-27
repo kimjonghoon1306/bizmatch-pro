@@ -362,7 +362,7 @@ export default function MemberAuthPage() {
                   </div>
                   <div>
                     <div className="info-pill" onClick={() => alert('로그인 없이 UI를 둘러볼 수 있어요.\n단, 실제 기능은 로그인 후 사용 가능해요.')}>ℹ️ 둘러보기란?</div>
-                    <button className="browse-btn" onClick={() => setBrowsing(true)}>
+                    <button className="browse-btn" onClick={() => { window.location.href = '/dashboard' }}>
                       <span>👀</span> 로그인 없이 둘러보기
                     </button>
                   </div>
