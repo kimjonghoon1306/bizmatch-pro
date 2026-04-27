@@ -202,12 +202,15 @@ export default function BuilderPage() {
     if (!title.trim()) return
     setLoading(true)
     const newSlug = generateSlug(title)
+    const info = typeof window !== 'undefined' ? localStorage.getItem('bizmatch_member_info') : null
+    const userId = info ? JSON.parse(info).email : 'admin'
     const { error } = await supabase.from('landing_pages').insert({
       slug: newSlug, title: title.trim(),
       description: description.trim() || null,
       category, contact_phone: phone.trim() || null,
       offer_text: offer.trim() || null,
       fields, is_active: true,
+      user_id: userId,
     })
     if (!error) { setSlug(newSlug); setDone(true) }
     setLoading(false)
