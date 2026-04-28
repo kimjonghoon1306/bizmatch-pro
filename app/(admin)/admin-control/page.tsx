@@ -720,30 +720,42 @@ export default function AdminControlPage() {
                   <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>🤖 AI API 키</div>
                   <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.6 }}>관리자용 AI 키예요. 이 기기에만 저장돼요.</p>
                   {[
-                    { key: 'admin_gemini', label: 'Gemini API Key', badge: '무료', color: '#22c55e', placeholder: 'AIza...', link: 'https://aistudio.google.com/app/apikey', icon: '🔵' },
-                    { key: 'admin_groq', label: 'Groq API Key (Llama 3)', badge: '무료', color: '#22c55e', placeholder: 'gsk_...', link: 'https://console.groq.com/keys', icon: '⚡' },
-                    { key: 'admin_openai', label: 'OpenAI API Key (GPT-4o)', badge: '유료', color: '#f59e0b', placeholder: 'sk-...', link: 'https://platform.openai.com/api-keys', icon: '🤖' },
+                    { key: 'admin_gemini', label: 'Gemini API Key', badge: '무료', badgeDesc: '글 생성', color: '#22c55e', placeholder: 'AIzaSy...', link: 'https://aistudio.google.com/app/apikey', linkText: 'Google AI Studio에서 발급받기', icon: '🔵', desc: '무료 · 글 자동 생성', noKey: false },
+                    { key: 'admin_groq', label: 'Groq API Key', badge: '무료', badgeDesc: '글 생성', color: '#22c55e', placeholder: 'gsk_...', link: 'https://console.groq.com/keys', linkText: 'Groq Console에서 발급받기', icon: '⚡', desc: '무료 · 빠른 속도 · Gemini 대체', noKey: false },
+                    { key: 'admin_openai', label: 'OpenAI API Key', badge: '유료', badgeDesc: '글+이미지', color: '#f59e0b', placeholder: 'sk-...', link: 'https://platform.openai.com/api-keys', linkText: 'OpenAI Platform에서 발급받기', icon: '🤖', desc: '유료 · 글(GPT-4o) + 이미지(DALL-E 3) 동시 사용', noKey: false },
+                    { key: 'admin_pollinations', label: 'Pollinations (이미지)', badge: '무료 · 키 불필요', badgeDesc: '이미지 생성', color: '#8b5cf6', placeholder: '키 없이 바로 사용 가능해요!', link: 'https://pollinations.ai', linkText: 'Pollinations 사이트 보기', icon: '🎨', desc: '무료 · 이미지 생성 · 키 불필요', noKey: true },
                   ].map(f => (
-                    <div key={f.key} style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>{f.icon}</span>
-                          <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{f.label}</label>
-                          <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 100, background: `${f.color}22`, color: f.color }}>{f.badge}</span>
+                    <div key={f.key} style={{ marginBottom: 16, background: 'var(--bg3)', borderRadius: 14, padding: '14px 16px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 22 }}>{f.icon}</span>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <label style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{f.label}</label>
+                              <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 100, background: `${f.color}22`, color: f.color }}>{f.badge}</span>
+                            </div>
+                            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{f.desc}</p>
+                          </div>
                         </div>
-                        <a href={f.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>🔗 발급받기</a>
+                        <a href={f.link} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, background: 'var(--accent-bg)', border: '1px solid var(--accent)', color: 'var(--accent)', textDecoration: 'none', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                          🔗 발급받기
+                        </a>
                       </div>
-                      <div style={{ position: 'relative' }}>
+                      {f.noKey ? (
+                        <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--success)', fontWeight: 700 }}>
+                          ✅ 키 없이 바로 사용 가능해요!
+                        </div>
+                      ) : (
                         <input
                           type="password"
                           placeholder={f.placeholder}
                           defaultValue={typeof window !== 'undefined' ? localStorage.getItem(f.key) || '' : ''}
                           onChange={e => { if (typeof window !== 'undefined') localStorage.setItem(f.key, e.target.value) }}
-                          style={{ width: '100%', background: 'var(--bg3)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '13px 15px', fontFamily: 'inherit', fontSize: 15, color: 'var(--text)', outline: 'none' }}
+                          style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '12px 14px', fontFamily: 'inherit', fontSize: 14, color: 'var(--text)', outline: 'none' }}
                           onFocus={e => e.target.style.borderColor = 'var(--accent)'}
                           onBlur={e => e.target.style.borderColor = 'var(--border)'}
                         />
-                      </div>
+                      )}
                     </div>
                   ))}
                   <button onClick={() => { alert('✅ 저장되었어요!') }} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, marginBottom: 8, boxShadow: '0 4px 14px var(--accent-glow)' }}>
