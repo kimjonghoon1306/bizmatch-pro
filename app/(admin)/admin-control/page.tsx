@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { formatDate, formatRelative, statusLabel, categoryLabel } from '@/lib/utils'
 import type { Lead, LandingPage, AutomationSetting } from '@/lib/types'
 import { Eye, EyeOff, ToggleLeft, ToggleRight, X, Send } from 'lucide-react'
@@ -279,7 +278,6 @@ export default function AdminControlPage() {
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text2)', marginLeft: 46 }}>모든 기능을 한 곳에서 관리하세요</p>
               </div>
-              <ThemeToggle />
             </div>
 
             {/* TABS */}
