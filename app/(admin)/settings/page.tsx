@@ -78,6 +78,9 @@ export default function SettingsPage() {
   const [showPw, setShowPw] = useState(false)
   const [aiKeys, setAiKeys] = useState<Record<string, string>>({})
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [selectedTextAi, setSelectedTextAi] = useState<string>('gemini')
+  const [selectedImageAi, setSelectedImageAi] = useState<string>('pollinations')
+  const [justSelected, setJustSelected] = useState<string>('')
   const [myPages, setMyPages] = useState<MyPage[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -99,6 +102,10 @@ export default function SettingsPage() {
     }
     const keys = localStorage.getItem(MEMBER_AI_KEY)
     if (keys) setAiKeys(JSON.parse(keys))
+    const textAi = localStorage.getItem('member_text_ai')
+    if (textAi) setSelectedTextAi(textAi)
+    const imageAi = localStorage.getItem('member_image_ai')
+    if (imageAi) setSelectedImageAi(imageAi)
   }, [])
 
   const loadMyPages = useCallback(async () => {
@@ -130,7 +137,16 @@ export default function SettingsPage() {
 
   function handleSaveAi() {
     localStorage.setItem(MEMBER_AI_KEY, JSON.stringify(aiKeys))
-    trigOk('AI 키가 저장되었어요!')
+    localStorage.setItem('member_text_ai', selectedTextAi)
+    localStorage.setItem('member_image_ai', selectedImageAi)
+    trigOk('AI 설정이 저장되었어요!')
+  }
+
+  function selectAi(type: 'text'|'image', key: string) {
+    if (type === 'text') setSelectedTextAi(key)
+    else setSelectedImageAi(key)
+    setJustSelected(type + '_' + key)
+    setTimeout(() => setJustSelected(''), 1200)
   }
 
   async function handleDeletePage(id: string) {
@@ -160,6 +176,8 @@ export default function SettingsPage() {
     <>
       <style>{`
         @keyframes skelPulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes selectPop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1.03)} }
         .set-inp:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-glow) !important; }
         .key-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 14px; transition: border-color 0.2s; }
         .key-card:hover { border-color: var(--border2); }
@@ -230,8 +248,91 @@ export default function SettingsPage() {
         {/* ── AI KEYS ── */}
         {tab === 'ai' && (
           <div>
-            <HelpBox title="AI 키란 무엇인가요?" desc="AI 키는 인공지능 서비스를 사용하기 위한 비밀번호예요. 아래에서 각 서비스 키를 입력하고 저장하면 AI 글 자동 생성과 이미지 생성 기능을 사용할 수 있어요." />
+            <HelpBox title="AI 키 설정 방법" desc="① 아래에서 사용할 AI 키를 입력해요 → ② 글 생성 AI와 이미지 생성 AI를 선택해요 → ③ 저장하기를 눌러요. 설정한 AI가 랜딩 만들기에서 자동으로 사용돼요." />
 
+            {/* AI 선택 섹션 */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginBottom: 16 }}>
+              <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 20 }}>🎯</span> 사용할 AI 선택
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.6 }}>
+                글 생성과 이미지 생성에 각각 어떤 AI를 쓸지 선택하세요. 키가 없는 AI는 선택해도 작동하지 않아요.
+              </p>
+
+              {/* 글 생성 AI */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--text2)', marginBottom: 10 }}>
+                  ✍️ 글 생성 AI 선택
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {AI_CONFIGS.filter(c => !c.noKey).map(cfg => {
+                    const isSelected = selectedTextAi === cfg.key
+                    const isJust = justSelected === 'text_' + cfg.key
+                    return (
+                      <button key={cfg.key} onClick={() => selectAi('text', cfg.key)} style={{
+                        padding: '10px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                        border: `2px solid ${isSelected ? cfg.badgeColor : 'var(--border2)'}`,
+                        background: isSelected ? `${cfg.badgeColor}18` : 'var(--bg3)',
+                        color: isSelected ? cfg.badgeColor : 'var(--text2)',
+                        fontWeight: isSelected ? 800 : 600, fontSize: 13,
+                        transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+                        transform: isJust ? 'scale(1.1)' : isSelected ? 'scale(1.03)' : 'scale(1)',
+                        boxShadow: isSelected ? `0 4px 16px ${cfg.badgeColor}33` : 'none',
+                      }}>
+                        {cfg.icon} {cfg.label.split(' ')[0]}
+                        {isSelected && <span style={{ marginLeft: 6, fontSize: 14 }}>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedTextAi && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, animation: 'fadeIn .3s ease' }}>
+                    ✅ {AI_CONFIGS.find(c => c.key === selectedTextAi)?.label} 선택됨
+                  </div>
+                )}
+              </div>
+
+              {/* 이미지 생성 AI */}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--text2)', marginBottom: 10 }}>
+                  🎨 이미지 생성 AI 선택
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[
+                    AI_CONFIGS.find(c => c.key === 'pollinations')!,
+                    AI_CONFIGS.find(c => c.key === 'openai')!,
+                  ].map(cfg => {
+                    const isSelected = selectedImageAi === cfg.key
+                    const isJust = justSelected === 'image_' + cfg.key
+                    return (
+                      <button key={cfg.key} onClick={() => selectAi('image', cfg.key)} style={{
+                        padding: '10px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                        border: `2px solid ${isSelected ? cfg.badgeColor : 'var(--border2)'}`,
+                        background: isSelected ? `${cfg.badgeColor}18` : 'var(--bg3)',
+                        color: isSelected ? cfg.badgeColor : 'var(--text2)',
+                        fontWeight: isSelected ? 800 : 600, fontSize: 13,
+                        transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+                        transform: isJust ? 'scale(1.1)' : isSelected ? 'scale(1.03)' : 'scale(1)',
+                        boxShadow: isSelected ? `0 4px 16px ${cfg.badgeColor}33` : 'none',
+                      }}>
+                        {cfg.icon} {cfg.key === 'pollinations' ? 'Pollinations' : 'OpenAI DALL-E'}
+                        {isSelected && <span style={{ marginLeft: 6, fontSize: 14 }}>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedImageAi && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ✅ {selectedImageAi === 'pollinations' ? 'Pollinations (무료)' : 'OpenAI DALL-E (유료)'} 선택됨
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 키 입력 섹션 */}
+            <p style={{ fontWeight: 800, fontSize: 14, color: 'var(--text2)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🔑 API 키 입력
+            </p>
             {AI_CONFIGS.map(cfg => (
               <div key={cfg.key} className="key-card">
                 {/* 헤더 */}
