@@ -170,6 +170,9 @@ export default function AdminControlPage() {
   const [editDesc, setEditDesc] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editOffer, setEditOffer] = useState('')
+  const [adminTextAi, setAdminTextAi] = useState('gemini')
+  const [adminImageAi, setAdminImageAi] = useState('pollinations')
+  const [adminJustSelected, setAdminJustSelected] = useState('')
   const [curPw, setCurPw] = useState('')
   const [newAdminPw, setNewAdminPw] = useState('')
   const [newAdminPw2, setNewAdminPw2] = useState('')
@@ -185,6 +188,13 @@ export default function AdminControlPage() {
     }).eq('id', id)
     setPages(prev => prev.map(p => p.id === id ? { ...p, title: editTitle, description: editDesc, contact_phone: editPhone, offer_text: editOffer } : p))
     setEditingPage(null)
+  }
+
+  function selectAdminAi(type: 'text'|'image', key: string) {
+    if(type==='text') setAdminTextAi(key)
+    else setAdminImageAi(key)
+    setAdminJustSelected(type+'_'+key)
+    setTimeout(()=>setAdminJustSelected(''),1200)
   }
 
   function handleChangePw() {
@@ -758,8 +768,75 @@ export default function AdminControlPage() {
                       )}
                     </div>
                   ))}
-                  <button onClick={() => { alert('✅ 저장되었어요!') }} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, marginBottom: 8, boxShadow: '0 4px 14px var(--accent-glow)' }}>
-                    💾 AI 키 저장하기
+                  {/* AI 선택 */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, marginBottom: 14 }}>
+                    <p style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>🎯 사용할 AI 선택</p>
+                    <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, lineHeight: 1.6 }}>글 생성과 이미지 생성에 각각 어떤 AI를 쓸지 선택하세요.</p>
+
+                    <div style={{ marginBottom: 14 }}>
+                      <p style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 8 }}>✍️ 글 생성 AI</p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {[
+                          {key:'gemini',label:'🔵 Gemini',color:'#22c55e'},
+                          {key:'groq',label:'⚡ Groq',color:'#22c55e'},
+                          {key:'openai',label:'🤖 OpenAI',color:'#f59e0b'},
+                        ].map(opt => {
+                          const isSel = adminTextAi === opt.key
+                          const isJust = adminJustSelected === 'text_' + opt.key
+                          return (
+                            <button key={opt.key} onClick={() => selectAdminAi('text', opt.key)} style={{
+                              padding: '9px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                              border: `2px solid ${isSel ? opt.color : 'var(--border2)'}`,
+                              background: isSel ? `${opt.color}18` : 'var(--bg3)',
+                              color: isSel ? opt.color : 'var(--text2)',
+                              fontWeight: isSel ? 800 : 600, fontSize: 13,
+                              transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+                              transform: isJust ? 'scale(1.1)' : isSel ? 'scale(1.03)' : 'scale(1)',
+                              boxShadow: isSel ? `0 4px 14px ${opt.color}33` : 'none',
+                            }}>
+                              {opt.label}{isSel && ' ✓'}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6, fontWeight: 700 }}>✅ {adminTextAi === 'gemini' ? 'Gemini' : adminTextAi === 'groq' ? 'Groq' : 'OpenAI'} 선택됨</p>
+                    </div>
+
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 8 }}>🎨 이미지 생성 AI</p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {[
+                          {key:'pollinations',label:'🎨 Pollinations',color:'#8b5cf6'},
+                          {key:'openai',label:'🤖 OpenAI DALL-E',color:'#f59e0b'},
+                        ].map(opt => {
+                          const isSel = adminImageAi === opt.key
+                          const isJust = adminJustSelected === 'image_' + opt.key
+                          return (
+                            <button key={opt.key} onClick={() => selectAdminAi('image', opt.key)} style={{
+                              padding: '9px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                              border: `2px solid ${isSel ? opt.color : 'var(--border2)'}`,
+                              background: isSel ? `${opt.color}18` : 'var(--bg3)',
+                              color: isSel ? opt.color : 'var(--text2)',
+                              fontWeight: isSel ? 800 : 600, fontSize: 13,
+                              transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+                              transform: isJust ? 'scale(1.1)' : isSel ? 'scale(1.03)' : 'scale(1)',
+                              boxShadow: isSel ? `0 4px 14px ${opt.color}33` : 'none',
+                            }}>
+                              {opt.label}{isSel && ' ✓'}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6, fontWeight: 700 }}>✅ {adminImageAi === 'pollinations' ? 'Pollinations (무료)' : 'OpenAI DALL-E (유료)'} 선택됨</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => {
+                    localStorage.setItem('admin_text_ai', adminTextAi)
+                    localStorage.setItem('admin_image_ai', adminImageAi)
+                    alert('✅ AI 설정이 저장되었어요!')
+                  }} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, marginBottom: 8, boxShadow: '0 4px 14px var(--accent-glow)' }}>
+                    💾 AI 설정 저장하기
                   </button>
                   <div style={{ height: 8 }} />
                   <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent)', borderRadius: 12, padding: '12px 14px' }}>
