@@ -187,7 +187,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="al-bottom">
-            <ThemeToggle />
             <button className="al-logout" onClick={handleLogout}>🚪 로그아웃</button>
             <div className="al-version">BizMatch PRO v0.2.0</div>
           </div>
